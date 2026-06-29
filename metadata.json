@@ -1,0 +1,6 @@
+{
+  "name": "homstay",
+  "description": "A mobile-first real estate application for finding PGs, apartments, and rooms with zero brokerage.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

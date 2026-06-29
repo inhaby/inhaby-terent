@@ -1,0 +1,52 @@
+:root {
+  /* Defaults: Light, Terracotta */
+  --bg: #FAF8F5;
+  --surface: #FFFFFF;
+  --text-primary: #2D2D2D;
+  --text-secondary: #6B7280;
+  --border: #E7E5E4;
+  
+  --accent: #B85C38;
+  --accent-hover: #A34E2C;
+  --accent-soft: #F7EBE5;
+  --accent-contrast: #FFFFFF;
+}
+
+/* Light / Dark modes variables override */
+.theme-dark {
+  --bg: #18181B;
+  --surface: #27272A;
+  --text-primary: #FAFAFA;
+  --text-secondary: #A1A1AA;
+  --border: #3F3F46;
+}
+
+.theme-light {
+  --bg: #FAF8F5;
+  --surface: #FFFFFF;
+  --text-primary: #2D2D2D;
+  --text-secondary: #6B7280;
+  --border: #E7E5E4;
+}
+
+/* Accent configurations styles (React app applies one of these onto high level element) */
+.accent-terracotta {
+  --accent: #B85C38;
+  --accent-hover: #A34E2C;
+  --accent-soft: rgba(184, 92, 56, 0.08);
+}
+.accent-olive {
+  --accent: #5C6B4F;
+  --accent-hover: #4D5A42;
+  --accent-soft: rgba(92, 107, 79, 0.08);
+}
+.accent-sand {
+  --accent: #C2A878;
+  --accent-hover: #A88E61;
+  --accent-soft: rgba(194, 168, 120, 0.08);
+}
+.accent-slate {
+  --accent: #607D8B;
+  --accent-hover: #526D79;
+  --accent-soft: rgba(96, 125, 139, 0.08);
+}
