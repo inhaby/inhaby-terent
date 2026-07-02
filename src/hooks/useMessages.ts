@@ -9,7 +9,12 @@ export function useMessages() {
   const [isMobileChatActive, setIsMobileChatActive] = useState<boolean>(false);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setUnreadChatsCount(0);
+      setOpenMsgPropertyId(null);
+      setIsMobileChatActive(false);
+      return;
+    }
 
     const fetchUnreadCount = async () => {
       const { data: convs, error } = await supabase

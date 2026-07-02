@@ -41,6 +41,10 @@ export function useVisits() {
   };
 
   useEffect(() => {
+    if (!user) {
+      setVisitRequests([]);
+      return;
+    }
     fetchVisits();
   }, [user]);
 

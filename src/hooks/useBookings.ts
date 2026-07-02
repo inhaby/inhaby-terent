@@ -99,6 +99,12 @@ export function useBookings() {
   };
 
   useEffect(() => {
+    if (!user) {
+      setActiveTenancy(null);
+      setPendingBookings([]);
+      setPastBookings([]);
+      return;
+    }
     fetchBookings();
   }, [user]);
 

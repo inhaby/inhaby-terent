@@ -50,6 +50,10 @@ export function useNotifications() {
   };
 
   useEffect(() => {
+    if (!user) {
+      setNotifications([]);
+      return;
+    }
     fetchNotifications();
   }, [user]);
 

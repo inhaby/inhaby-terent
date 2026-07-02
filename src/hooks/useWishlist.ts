@@ -27,6 +27,10 @@ export function useWishlist() {
   };
 
   useEffect(() => {
+    if (!user) {
+      setSavedIds(new Set());
+      return;
+    }
     fetchWishlist();
   }, [user]);
 

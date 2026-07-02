@@ -122,7 +122,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const { savedIds, toggleSave: originalToggleSave, wishlistSort, setWishlistSort, getSortedWishlist } = useWishlist();
   const { visitRequests, setVisitRequests, addVisitRequest } = useVisits();
   const { unreadChatsCount, openMsgPropertyId, setOpenMsgPropertyId, isMobileChatActive, setIsMobileChatActive } = useMessages();
-  const { searchQuery, setSearchQuery, recentlyViewedIds } = useSearch();
+  const { searchQuery, setSearchQuery, recentlyViewedIds, setRecentlyViewedIds } = useSearch();
 
   // Location details
   const [activeLocation, setActiveLocation] = useState<LocationInfo>(() => {
@@ -280,6 +280,25 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (viewed.length > 0) return viewed.slice(0, 4);
     return currentCategoryProperties.slice(4, 8);
   }, [recentlyViewedIds, currentCategoryProperties, activeCategory, findPropertyById]);
+
+  useEffect(() => {
+    if (!user) {
+      setActiveLocation({ name: "", area: "", city: "", pincode: "" });
+      setIsLocationSelectorOpen(false);
+      setIsNotificationsOpen(false);
+      setIsBookVisitModalOpen(false);
+      setBookingPropertyId(null);
+      setChosenBookingMsg('');
+      setSearchQuery('');
+      if (setRecentlyViewedIds) {
+        setRecentlyViewedIds([]);
+      }
+      try {
+        localStorage.removeItem('homstay-active-location');
+        localStorage.removeItem('homstay-recent-viewed');
+      } catch (e) {}
+    }
+  }, [user, setSearchQuery, setRecentlyViewedIds]);
 
   const toggleSave = useCallback((id: string) => {
     if (!user || !profile) {
