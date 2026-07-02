@@ -1,16 +1,42 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-// Since TenantAuthContext.tsx will be moved/kept in src/context/TenantAuthContext.tsx or src/app/context/TenantAuthContext.tsx, let's import it from '../context/TenantAuthContext' or create the directory src/context/ if it is shared.
-// Actually, useAuth is currently defined in src/context/TenantAuthContext.tsx. Let's import it from '../context/TenantAuthContext' to be safe.
-import { useAuth } from '../context/TenantAuthContext';
+import { supabase } from '@inhaby/shared';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
+/**
+ * ProtectedRoute — guards /app/* routes.
+ *
+ * IMPORTANT: This component is rendered OUTSIDE AuthProvider (AuthProvider lives
+ * inside TenantApp, which is the child being guarded). Therefore we MUST check
+ * the session directly via Supabase instead of calling useAuth().
+ */
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { user, profile, loading } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [hasSession, setHasSession] = useState(false);
   const location = useLocation();
+
+  useEffect(() => {
+    // Initial session check
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setHasSession(!!session);
+      setLoading(false);
+    });
+
+    // Keep in sync with auth state changes (logout, token refresh, etc.)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setHasSession(!!session);
+      if (!session) {
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   if (loading) {
     return (
@@ -20,16 +46,32 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     );
   }
 
-  if (!user || !profile) {
-    // Redirect to root "/" (Landing Page) for guest session
-    return <Navigate to="/" replace />;
+  if (!hasSession) {
+    // No Supabase session → send to landing page, preserving intended destination
+    return <Navigate to="/" state={{ from: location }} replace />;
   }
 
   return <>{children}</>;
 };
 
 export const GuestRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { user, profile, loading } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [hasSession, setHasSession] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setHasSession(!!session);
+      setLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setHasSession(!!session);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   if (loading) {
     return (
@@ -39,7 +81,7 @@ export const GuestRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     );
   }
 
-  if (user && profile) {
+  if (hasSession) {
     // Redirect to authenticated tenant application
     return <Navigate to="/app" replace />;
   }
