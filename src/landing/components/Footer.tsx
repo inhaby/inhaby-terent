@@ -20,20 +20,20 @@ const footerColumns = [
   {
     title: "Company",
     links: [
-      { name: "About Inhaby", href: "#", external: false },
+      { name: "About Inhaby", href: "/about", external: false },
       { name: "Trust Blog", href: "/blog", external: false },
-      { name: "Our Mission", href: "#", external: false },
-      { name: "Careers (Hiring!)", href: "#", external: false },
-      { name: "Contact Verification", href: "#", external: false },
+      { name: "Our Mission", href: "/about", external: false },
+      { name: "Careers (Hiring!)", href: "/about", external: false },
+      { name: "Contact Verification", href: "/verify", external: false },
     ],
   },
   {
     title: "Legal",
     links: [
-      { name: "Privacy Policy", href: "#", external: false },
-      { name: "Terms of Service", href: "#", external: false },
-      { name: "E-Stamp Integrity", href: "#", external: false },
-      { name: "Security Protocols", href: "#", external: false },
+      { name: "Privacy Policy", href: "/about", external: false },
+      { name: "Terms of Service", href: "/about", external: false },
+      { name: "E-Stamp Integrity", href: "/about", external: false },
+      { name: "Security Protocols", href: "/about", external: false },
     ],
   },
 ];

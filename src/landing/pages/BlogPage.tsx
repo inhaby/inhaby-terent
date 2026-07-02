@@ -12,8 +12,9 @@ import ReactMarkdown from "react-markdown";
 import OptimizedImage from "../components/OptimizedImage";
 import { BLOG_ARTICLES, BlogArticle } from "../data/blogData";
 
-export default function BlogPage() {
-  const { slug } = useParams<{ slug: string }>();
+export default function BlogPage({ overrideSlug }: { overrideSlug?: string }) {
+  const { slug: urlSlug } = useParams<{ slug: string }>();
+  const slug = overrideSlug || urlSlug;
   const [activeTab, setActiveTab] = useState<"reader" | "seo">("reader");
   const [activeSection, setActiveSection] = useState("intro");
   const [scrollProgress, setScrollProgress] = useState(0);
@@ -654,7 +655,7 @@ export default function BlogPage() {
 
               <div className="flex flex-col sm:flex-row justify-center items-center gap-4 pt-2">
                 <Link 
-                  to="/"
+                  to="/landing"
                   className="w-full sm:w-auto px-8 py-3.5 bg-primary text-primary-foreground hover:opacity-95 text-xs font-extrabold rounded-xl transition-all shadow-sm text-center"
                 >
                   Get Started (Tenant Portal)

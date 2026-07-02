@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/TenantAuthContext';
 import { Mail, Lock, Sparkles, AlertCircle, ArrowRight, X } from 'lucide-react';
 import { motion } from 'motion/react';
@@ -8,6 +8,7 @@ import { useAppContext } from '../app/AppContext';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { showToast } = useAppContext();
   const { signIn, signInWithGoogle, authError, setAuthError } = useAuth();
   const [email, setEmail] = useState('');
@@ -63,7 +64,8 @@ export const LoginPage: React.FC = () => {
         showToast(parsed, 'error');
       } else {
         showToast('Signed in successfully!', 'success');
-        navigate('/app');
+        const redirectUrl = searchParams.get('redirect') || '/app';
+        navigate(redirectUrl);
       }
     } catch (err: any) {
       const parsed = err.message || 'An unexpected error occurred.';
@@ -130,7 +132,7 @@ export const LoginPage: React.FC = () => {
         <div className="absolute top-0 left-0 right-0 h-1.5 bg-theme-accent" />
 
         <button 
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/landing')}
           className="absolute top-4 right-4 p-2 bg-theme-bg hover:bg-theme-border/40 rounded-full text-theme-text-secondary hover:text-theme-accent active:scale-95 transition-all outline-none z-50 cursor-pointer"
         >
           <X size={16} />

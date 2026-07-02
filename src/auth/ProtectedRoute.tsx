@@ -47,8 +47,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   }
 
   if (!hasSession) {
-    // No Supabase session → send to landing page, preserving intended destination
-    return <Navigate to="/" state={{ from: location }} replace />;
+    const redirectUrl = encodeURIComponent(location.pathname + location.search);
+    return <Navigate to={`/login?redirect=${redirectUrl}`} replace />;
   }
 
   return <>{children}</>;

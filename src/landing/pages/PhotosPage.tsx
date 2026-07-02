@@ -64,7 +64,7 @@ export default function PhotosPage() {
           className="mb-12"
         >
           <Link 
-            to="/" 
+            to="/landing" 
             className="inline-flex items-center text-muted-foreground hover:text-primary transition-colors mb-6 group"
           >
             <ArrowLeft className="w-4 h-4 mr-2 transition-transform group-hover:-translate-x-1" />
@@ -140,7 +140,7 @@ export default function PhotosPage() {
              <button className="px-8 py-3 bg-primary text-primary-foreground rounded-2xl font-bold hover:shadow-lg hover:shadow-primary/20 transition-all">
                Get the App
              </button>
-             <Link to="/" className="px-8 py-3 bg-background text-foreground border border-border rounded-2xl font-bold hover:bg-muted transition-all">
+             <Link to="/landing" className="px-8 py-3 bg-background text-foreground border border-border rounded-2xl font-bold hover:bg-muted transition-all">
                Back to Home
              </Link>
           </div>

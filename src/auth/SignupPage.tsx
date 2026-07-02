@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/TenantAuthContext';
-import { Mail, Lock, User, Phone, Sparkles, AlertCircle, ArrowRight } from 'lucide-react';
+import { Mail, Lock, User, Phone, Sparkles, AlertCircle, ArrowRight, X } from 'lucide-react';
 import { motion } from 'motion/react';
 import { validateEmail, validatePassword, handleAuthError } from '@inhaby/shared';
 import { useAppContext } from '../app/AppContext';
@@ -189,6 +189,13 @@ export const SignupPage: React.FC = () => {
         className="w-full max-w-md bg-theme-surface border border-theme-border/60 rounded-[32px] p-8 shadow-xl relative overflow-hidden"
       >
         <div className="absolute top-0 left-0 right-0 h-1.5 bg-theme-accent" />
+
+        <button 
+          onClick={() => navigate('/landing')}
+          className="absolute top-4 right-4 p-2 bg-theme-bg hover:bg-theme-border/40 rounded-full text-theme-text-secondary hover:text-theme-accent active:scale-95 transition-all outline-none z-50 cursor-pointer"
+        >
+          <X size={16} />
+        </button>
 
         {/* Heading */}
         <div className="text-center mb-8">

@@ -27,6 +27,9 @@ import { OAuthCallback } from '../auth/OAuthCallback';
 // Authenticated Tenant App
 import { TenantApp } from '../app/App';
 
+import AboutPage from '../landing/pages/AboutPage';
+import HelpPage from '../landing/pages/HelpPage';
+
 // Wrapper for Landing page to redirect if session exists
 const LandingPageRoute: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -60,7 +63,8 @@ export const RootRouter: React.FC = () => {
       <Routes>
         {/* A. Landing Website (Guest pages) */}
         <Route element={<LandingApp />}>
-          <Route path="/" element={<LandingPageRoute />} />
+          <Route path="/" element={<Navigate to="/landing" replace />} />
+          <Route path="/landing" element={<LandingPageRoute />} />
           <Route path="/demo" element={<DemoPage />} />
           <Route path="/live-demo" element={<DemoPage />} />
           <Route path="/photos" element={<PhotosPage />} />
@@ -70,6 +74,9 @@ export const RootRouter: React.FC = () => {
           <Route path="/verify" element={<VerificationPage />} />
           <Route path="/blog" element={<BlogListingPage />} />
           <Route path="/blog/:slug" element={<BlogPage />} />
+          <Route path="/founder/genofogu" element={<BlogPage overrideSlug="about-genofogu" />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/help" element={<HelpPage />} />
           
           {/* City browse routes */}
           <Route path="/pg/:city" element={<LandingPageRoute />} />
@@ -93,7 +100,7 @@ export const RootRouter: React.FC = () => {
         <Route path="/app/*" element={<ProtectedRoute><TenantApp /></ProtectedRoute>} />
 
         {/* E. Catch-all redirect to root */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/landing" replace />} />
       </Routes>
     </BrowserRouter>
   );

@@ -32,7 +32,7 @@ export default function LandingHeader() {
     <nav className="fixed top-0 left-0 right-0 z-50 bg-background/85 backdrop-blur-md border-b border-border transition-all">
       <div className="container px-4 sm:px-6 py-2.5 md:py-4 mx-auto flex justify-between items-center">
         {/* Left: INHABY Logo */}
-        <Link to="/" className="hover:opacity-90 transition-opacity flex items-center">
+        <Link to="/landing" className="hover:opacity-90 transition-opacity flex items-center">
           <Logo className="h-7.5 md:h-10" />
         </Link>
         
@@ -42,7 +42,7 @@ export default function LandingHeader() {
           <a href="https://careers.inhaby.com" className="hover:text-primary transition-colors">{t("nav.careers")}</a>
           <Link to="/pricing" className="hover:text-primary transition-colors">{t("nav.pricing")}</Link>
           <Link to="/blog" className="hover:text-primary transition-colors">{t("nav.blog")}</Link>
-          <a href="https://help.inhaby.com" className="hover:text-primary transition-colors">{t("nav.help")}</a>
+          <Link to="/help" className="hover:text-primary transition-colors">{t("nav.help")}</Link>
         </div>
         
         {/* Right / Mobile & Tablet Actions: Login & Hamburger */}
@@ -59,13 +59,13 @@ export default function LandingHeader() {
           ) : (
             <>
               <Link
-                to="/login"
+                to="/login?redirect=/app"
                 className="px-4 py-2 text-xs md:text-sm font-bold text-muted-foreground hover:text-primary transition-colors"
               >
                 Sign In
               </Link>
               <motion.button
-                onClick={() => navigate('/signup')}
+                onClick={() => navigate('/signup?redirect=/app')}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className="px-5 py-2 md:px-6 md:py-2.5 text-xs md:text-sm font-black text-primary-foreground bg-primary rounded-xl shadow-md shadow-primary/15 hover:opacity-95 transition-all flex items-center justify-center whitespace-nowrap cursor-pointer"
@@ -150,13 +150,13 @@ export default function LandingHeader() {
                   >
                     {t("nav.blog")}
                   </Link>
-                  <a
-                    href="https://help.inhaby.com"
+                  <Link
+                    to="/help"
                     onClick={() => setIsOpen(false)}
                     className="text-base font-bold text-foreground hover:text-primary transition-colors py-3 px-2 rounded-xl hover:bg-muted flex items-center"
                   >
                     {t("nav.help")}
-                  </a>
+                  </Link>
                 </div>
               </div>
 

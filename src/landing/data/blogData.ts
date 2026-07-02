@@ -2006,5 +2006,456 @@ Today, Inhaby's foundation became much stronger.`,
         }
       ]
     }
+  },
+  {
+  "id": "day-003-rebuilding-architecture",
+  "slug": "day-003-rebuilding-architecture",
+  "title": "Day 003 — I Broke Everything, Then Fixed It Properly",
+  "category": "Founder Journal",
+  "phase": "Phase 5 — Product Development Transparency",
+  "phaseNum": 5,
+  "description": "Genofogu, co-founder of Inhaby, reflects on spending a night rebuilding the tenant app's routing and authentication from the ground up — the decisions, the mistakes, and the lessons.",
+  "image": "https://images.unsplash.com/photo-1531403009284-440f080d1e12?auto=format&fit=crop&q=80&w=1200",
+  "author": {
+    "name": "Genofogu",
+    "role": "Co-Founder of Inhaby",
+    "avatar": "GF",
+    "bio": "Genofogu is the Co-Founder at INHABY, focused on core engineering and scaling infrastructures to support millions of home seekers.",
+    "socials": {
+      "twitter": "https://twitter.com/inhaby",
+      "linkedin": "https://linkedin.com/company/inhaby"
+    }
+  },
+  "publishedDate": "2026-07-03",
+  "readingTime": "8 minutes",
+  "trending": false,
+  "popular": true,
+  "tags": [
+    "founder",
+    "daily log",
+    "React",
+    "authentication",
+    "architecture",
+    "startup",
+    "proptech",
+    "learning in public"
+  ],
+  "content": "Last night I stayed up until about 3:45 in the morning fixing something that, honestly, should have never been built the way it was.\n\nI want to write this down not to brag — I didn't do anything impressive. I wrote code that was wrong, lived with it for a while, and then spent a night fixing it. That's not impressive. That's just what happens when you're building a product alone and making decisions faster than you probably should.\n\n---\n\n## What I Was Actually Trying to Fix\n\nA few days ago I merged the Inhaby landing page into the tenant app codebase. The idea was simple: one Vite project, one deployment, both surfaces — landing website for guests, and the tenant application for logged-in users.\n\nThe merge worked. The app ran. I pushed it and called it v1.7.\n\nBut there was a problem I had quietly swept under the rug: **the entire authentication system was mounted globally, even on the landing page where it wasn't needed.** Every guest who loaded the landing page was silently triggering a Supabase session check and spinning up the app state — notifications, wishlists, bookings, messages — all of it, for someone who hadn't even signed up yet.\n\nAnd when a logged-in user clicked Logout, the app would call `signOut()` and navigate to the home page... but all that state was still sitting in memory. If you opened React DevTools after logging out, you could still see the previous user's notifications. The wishlist wasn't cleared. The booking state was still there.\n\nThat's a bug. A real one. Not hypothetical — an actual security and UX failure.\n\n---\n\n## What Made It Worse\n\nI had also written the routing as one massive file. `AppRouter.tsx` was 1,114 lines long. Public routes, login routes, dashboard routes — all mixed together in one place. The auth guards were inconsistently applied. The logout didn't guarantee state cleanup. The landing page header was doing a hardcoded external link to `https://inhaby.com/login` instead of using React Router's `<Link to=\"/login\">`.\n\nWhen I stepped back and looked at it, I realised: this isn't something I can patch. I have to do it properly.\n\n---\n\n## The Decision to Start Over (architecturally)\n\nI've read enough engineering blogs to know that \"let's refactor it properly\" is often a trap. You spend three days on it, nothing gets better, and you've introduced five new bugs.\n\nSo before I touched a single file, I wrote a complete implementation plan. Thirteen success criteria. A route table. A header ownership contract. An explicit logout sequence, step by step.\n\nThe key insight I had was this: **the providers are in the wrong place.**\n\nIn v1.7, the `AuthProvider` and `AppStateProvider` were mounted above the router — meaning they existed on every page, including the landing page. The fix wasn't to add more cleanup code. The fix was to move these providers *inside* the authenticated sub-tree.\n\nWhen you log out and navigate to `/`, React unmounts the entire tenant app tree. That tree contains the providers. When those providers unmount, all state — every hook, every subscription, every cached value — is garbage collected automatically. No explicit cleanup needed. The architecture enforces the guarantee.\n\n---\n\n## What I Built\n\nI created two independent React sub-trees inside one Vite project:\n\n**Landing Website (no auth context at all)**\n- Lives at `/`\n- Has its own `LandingApp` wrapper with `LandingHeader`, footer, animations\n- Never imports anything from the tenant app context\n- The \"Login\" button is a proper internal React Router link, not an external URL\n\n**Tenant Application (auth-scoped)**\n- Lives at `/app/*`\n- `ProtectedRoute` guards the entire sub-tree — but importantly, the guard reads Supabase directly, not from a React context, because the context doesn't exist outside the sub-tree\n- `AuthProvider` and `AppStateProvider` only mount when a user is authenticated\n- `AppShell` wraps the sidebar, header, and router for the authenticated experience\n\nThat last part — the guard reading Supabase directly — is something I got wrong the first time tonight. I had written `ProtectedRoute` to call `useAuth()`. But `useAuth()` reads from `AuthProvider`, and `AuthProvider` is *inside* `TenantApp`, which is the child being guarded. Classic chicken-and-egg.\n\nThe error was direct: `useAuth must be used within an AuthProvider`. I read the stack trace, traced it to the provider ordering, and fixed it: `ProtectedRoute` now calls `supabase.auth.getSession()` directly — same as the `GuestRoute` already did. Problem solved.\n\n---\n\n## Fixing the Stale State Bug\n\nEven with the architecture fix, there was a second issue: during the brief window between `signOut()` resolving and React completing its re-render cycle, the hooks could still serve stale data. So I added explicit cleanup to every hook:\n\n```typescript\nuseEffect(() => {\n  if (!user) {\n    setNotifications([]);\n    return;\n  }\n  fetchNotifications();\n}, [user]);\n```\n\nI did this for five hooks: `useNotifications`, `useWishlist`, `useVisits`, `useBookings`, and `useMessages`. Each one now clears its state the moment `user` becomes `null`. The architecture-level guarantee handles the full teardown. The hook-level cleanup is defence-in-depth for the race window.\n\n---\n\n## What Actually Happened During the Build\n\nI started around 11pm. By 1am I had the new structure mostly written — 8 new files, 7 modified, 2 deleted. By 2am I had TypeScript errors I needed to resolve:\n\n- `AppShell` was passing `unreadChatsCount` but `BottomNavProps` expected `unreadCount`\n- `LocationSelectorModal` wanted `isOpen` and `activeLocation`, not `currentLocation`\n- The root `src/App.tsx` was pointing to the old monolith\n\nSmall stuff. But enough to fail the build.\n\nAt 3:45am I ran `npx tsc --noEmit`. Zero errors. Then `npm run build`. It completed in 21 seconds, 2,388 modules transformed.\n\nI committed it as `Version 1.8.0.0 — Refactor Complete with TS and build errors resolved` and pushed to `main`.\n\nThen I went to sleep.\n\n---\n\n## What I Learned\n\n**1. Providers belong close to their consumers.**\n\nIf a provider exists above the entire app, it runs for everyone — including people who don't need it. This wastes resources and creates cleanup problems. Mount providers as low as they can go while still covering everything that needs them.\n\n**2. Stale state after logout is an architecture problem, not a cleanup problem.**\n\nYou can add `setNotifications([])` to every hook forever. But the real fix is ensuring that the provider tree unmounts on logout. When the tree unmounts, React handles the rest.\n\n**3. Route guards cannot use context from within the thing they're guarding.**\n\n`ProtectedRoute` wraps `TenantApp`. `TenantApp` contains `AuthProvider`. So `ProtectedRoute` cannot call `useAuth()`. This seems obvious in hindsight. It wasn't obvious at 1am.\n\n**4. Write the plan before writing the code.**\n\nThe implementation plan I wrote before touching any file saved me at least two hours. It forced me to think about header ownership, provider ordering, and logout sequence before I had invested any code in the wrong direction.\n\n**5. 1,114 line files are always a smell.**\n\nIf a single file handles public routing, auth routing, and private routing — that file is doing too much. Split it.\n\n---\n\n## Where Inhaby Is Now\n\nInhaby v1.8.0.0 is committed and running. The architecture is clean. The landing page and the tenant app are properly separated. Logout is guaranteed. The build passes.\n\nTomorrow I'm going to start looking at the property detail page experience and the search functionality. But tonight, I'm satisfied. Not with the original problem — that was entirely my fault — but with having fixed it properly instead of patching it.\n\nThat's the thing about building a startup without a senior engineer looking over your shoulder. You make mistakes. Bigger mistakes than you'd make on a team. But you also learn faster, because every bug is yours to own completely.\n\n---\n\n## Vision for What I'm Building\n\nInhaby is a zero-brokerage property discovery and rental platform for tenants in India. The mission is simple: a tenant should be able to find a verified home, book a visit, and sign a lease without paying a single rupee to a broker.\n\nThat's a hard problem. The broker model in Indian real estate is decades old and deeply embedded. Inhaby doesn't defeat it with marketing — it defeats it by building a better product. A product where verified owners list directly, where tenants can message owners in real time, where visit scheduling is one tap, where the entire tenancy — from search to signing — happens inside the app.\n\nI'm building this mostly alone right now. The codebase has three applications: the tenant app, the owner portal, and the admin panel. All three share one TypeScript package — `@inhaby/shared` — that contains the Supabase client, all type definitions, and shared utilities. That package is published to GitHub Packages and installed as a scoped dependency in each app.\n\nIt's a real system. It works. It's also deeply imperfect, and I'm rewriting pieces of it regularly as I learn more about what \"production-quality\" actually means.\n\nThis journal is my attempt to document that process honestly. Not to present a polished version of the startup journey. The actual version. The 3am version.\n\n---\n\n## Related Articles\n\n- **Next:** [How We Built the @inhaby/shared GitHub Package](/blog/engineering/github-packages-inhaby)\n- **Next:** [Merging a Landing Page Into a React App Without Breaking Auth](/blog/engineering/landing-page-integration)\n- **Suggested Reading:** Who is Genofogu? — [/blog/founder-journal/about-genofogu](/blog/founder-journal/about-genofogu)\n\n---\n\n## Suggested Social Caption\n\n> \"Stayed up until 3:45am rebuilding Inhaby's routing from scratch. Not because I wanted to. Because the first version was broken in a way that couldn't be patched — only replaced. Here's what I learned. 🧵\"\n\n---\n\n## FAQ\n\n**Q: What is Inhaby?**\nA: Inhaby is a zero-brokerage property rental platform connecting tenants directly with verified property owners in India, eliminating broker fees.\n\n**Q: Who is building Inhaby?**\nA: Genofogu is the co-founder and primary engineer currently building the platform, working across three applications and a shared SDK.\n\n**Q: What is a Founder Journal?**\nA: The Founder Journal is Genofogu's daily engineering diary — honest, first-person accounts of what was actually built, broken, and learned each day.\n\n**Q: How do I follow the Inhaby build in public?**\nA: Subscribe to the Inhaby engineering blog at /blog or follow updates at /blog/founder-journal.\n\n---\n\n## JSON-LD Recommendations\n\n```json\n{\n  \"@context\": \"https://schema.org\",\n  \"@type\": \"BlogPosting\",\n  \"headline\": \"Day 003: I Rebuilt Inhaby's Architecture From Scratch\",\n  \"author\": {\n    \"@type\": \"Person\",\n    \"name\": \"Genofogu\",\n    \"url\": \"https://inhaby.com/founder/genofogu\",\n    \"jobTitle\": \"Co-Founder\",\n    \"worksFor\": {\n      \"@type\": \"Organization\",\n      \"name\": \"Inhaby\"\n    }\n  },\n  \"datePublished\": \"2026-07-03\",\n  \"dateModified\": \"2026-07-03\",\n  \"publisher\": {\n    \"@type\": \"Organization\",\n    \"name\": \"Inhaby\",\n    \"url\": \"https://inhaby.com\"\n  },\n  \"mainEntityOfPage\": {\n    \"@type\": \"WebPage\",\n    \"@id\": \"https://inhaby.com/blog/founder-journal/day-003-rebuilding-architecture\"\n  },\n  \"keywords\": \"Inhaby, founder journal, React refactor, startup engineering, authentication bug\",\n  \"articleSection\": \"Founder Journal\"\n}\n```",
+  "seo": {
+    "seoTitle": "Day 003: I Rebuilt Inhaby's Architecture From Scratch (And Why It Had to Happen)",
+    "seoSlug": "day-003-rebuilding-architecture",
+    "metaTitle": "Day 003: I Rebuilt Inhaby's Architecture From Scratch (And Why It Had to Happen)",
+    "metaDescription": "Genofogu, co-founder of Inhaby, reflects on spending a night rebuilding the tenant app's routing and authentication from the ground up — the decisions, the mistakes, and the lessons.",
+    "openGraphTitle": "Day 003: Rebuilding Inhaby's Core Architecture — A Founder's Honest Account",
+    "openGraphDesc": "One night, two major bugs, eight new files, and a complete React architectural refactor. This is what building a startup actually looks like.",
+    "canonicalUrl": "https://inhaby.com/blog/founder-journal/day-003-rebuilding-architecture",
+    "primaryCategory": "Founder Journal",
+    "secondaryCategory": "Startup Journey",
+    "tags": [
+      "founder",
+      "daily log",
+      "React",
+      "authentication",
+      "architecture",
+      "startup",
+      "proptech",
+      "learning in public"
+    ],
+    "readingTime": "8 minutes",
+    "publishedDate": "2026-07-03",
+    "updatedDate": "2026-07-03",
+    "targetAudience": "Startup Founders, React Developers, Aspiring Entrepreneurs",
+    "featuredImage": {
+      "url": "https://images.unsplash.com/photo-1531403009284-440f080d1e12?auto=format&fit=crop&q=80&w=1200",
+      "suggestion": "A dark desk late at night, a single monitor glowing with a React component tree diagram, a notebook open beside it with rough architecture sketches, and a half-empty cup of tea.",
+      "alt": "A developer's late-night workspace with code on screen and architecture notes in a notebook, representing the Inhaby founder's engineering process."
+    },
+    "lsiKeywords": [
+      {
+        "word": "Inhaby founder journal",
+        "count": 2,
+        "type": "Primary Keyword"
+      },
+      {
+        "word": "building a startup",
+        "count": 2,
+        "type": "Primary Keyword"
+      },
+      {
+        "word": "React refactor",
+        "count": 2,
+        "type": "Primary Keyword"
+      },
+      {
+        "word": "authentication bug",
+        "count": 2,
+        "type": "Primary Keyword"
+      },
+      {
+        "word": "how to fix React auth state after logout",
+        "count": 2,
+        "type": "Secondary Keyword"
+      },
+      {
+        "word": "React provider ordering bug",
+        "count": 2,
+        "type": "Secondary Keyword"
+      },
+      {
+        "word": "startup engineering blog India",
+        "count": 2,
+        "type": "Secondary Keyword"
+      },
+      {
+        "word": "building a proptech startup from scratch",
+        "count": 2,
+        "type": "Secondary Keyword"
+      }
+    ],
+    "geoAeoFeatures": [
+      {
+        "type": "Direct Answer (AEO)",
+        "desc": "Provides a direct explanation matching the key entities for search engines query optimization."
+      }
+    ]
   }
+},
+  {
+  "id": "about-genofogu",
+  "slug": "about-genofogu",
+  "title": "Who Is Genofogu?",
+  "category": "Founder Journal",
+  "phase": "Phase 5 — Product Development Transparency",
+  "phaseNum": 5,
+  "description": "Meet Genofogu, the co-founder building Inhaby — a zero-brokerage property rental platform in India. An honest introduction: who he is, why he started Inhaby, and what he's learning.",
+  "image": "https://images.unsplash.com/photo-1531403009284-440f080d1e12?auto=format&fit=crop&q=80&w=1200",
+  "author": {
+    "name": "Genofogu",
+    "role": "Co-Founder of Inhaby",
+    "avatar": "GF",
+    "bio": "Genofogu is the Co-Founder at INHABY, focused on core engineering and scaling infrastructures to support millions of home seekers.",
+    "socials": {
+      "twitter": "https://twitter.com/inhaby",
+      "linkedin": "https://linkedin.com/company/inhaby"
+    }
+  },
+  "publishedDate": "2026-07-03",
+  "readingTime": "6 minutes",
+  "trending": false,
+  "popular": true,
+  "tags": [
+    "founder",
+    "about",
+    "proptech",
+    "India",
+    "startup",
+    "zero brokerage",
+    "building in public"
+  ],
+  "content": "I'm Genofogu. I'm the co-founder of Inhaby.\n\nThat sentence sounds more official than the reality. The reality is that most days I'm just one person sitting at a desk, writing code, making mistakes, fixing them, and trying to build something that actually helps people find a home without being robbed by a broker.\n\nThis page is my attempt to introduce myself honestly — not in the way founders usually introduce themselves on \"About\" pages, with carefully chosen words designed to project credibility. Just the actual version.\n\n---\n\n## Why Inhaby Exists\n\nRenting a home in India is expensive in ways that have nothing to do with the home itself.\n\nThe broker model is the default. You find a flat you like. The broker who showed it to you takes a fee — typically one month's rent, sometimes two. You pay it, because there's no other path. The owner won't deal with you directly. The broker controls access.\n\nThat's not a market failure. It's a structural inefficiency that's been normalised because no one built a better system.\n\nI started thinking about Inhaby because I watched people around me — good people, working people — spend money they didn't have to spend on something that shouldn't cost anything. A broker's job is to introduce two parties. When both parties are already online, that introduction doesn't need to cost a month's rent.\n\nInhaby's premise is simple: **verified owners list their properties directly. Tenants find them, message them, schedule visits, and sign leases — without a broker in the middle.**\n\nThat's the whole idea. It's not complicated. The difficulty is in building the system that makes it trustworthy enough that both sides — owners and tenants — actually use it.\n\n---\n\n## What I'm Building\n\nInhaby isn't a single app. It's a platform with three surfaces:\n\n1. **The Tenant App** — where renters search, save, book visits, and manage their tenancy\n2. **The Owner Portal** — where property owners list, manage leads, communicate with tenants, and track payments\n3. **The Admin Panel** — internal tools for moderating listings, verifying owners, and managing the platform\n\nAll three share one TypeScript package — `@inhaby/shared` — that contains the Supabase client, all data models, and shared utilities. It's published as a scoped package under the `@inhaby` GitHub Packages registry.\n\nThe backend is Supabase. The frontend is React with Vite. The styling is Tailwind. The whole thing is deployed from a monorepo structure where each application is independent but shares common infrastructure.\n\nIs this the optimal architecture for a startup? Probably not perfectly. But it's what I understand, it works, and it lets me move fast without constantly reinstalling shared dependencies.\n\n---\n\n## Building While Learning\n\nI want to be honest about this: I am learning while I build.\n\nI'm not a computer science graduate. I'm not a senior engineer with ten years of production experience. I'm someone who taught himself to code, who reads documentation carefully, who makes mistakes and then spends hours or days understanding exactly what went wrong and why.\n\nMost of what I know about React I learned by building Inhaby. Most of what I know about Supabase I learned by using it. The same is true for TypeScript, for authentication flows, for database design.\n\nThis is a real limitation. There are definitely architectural decisions I've made that a more experienced engineer would have made differently. I know this because I find the evidence myself — I wrote code, shipped it, and later discovered it had a fundamental problem I missed entirely.\n\nBut there's a different kind of knowledge you get from building something real. Not hypothetical. Not tutorial-scale. A real system with real users in mind, real edge cases, real security requirements. You learn differently when the mistakes are yours to fix.\n\n---\n\n## Challenges Faced\n\n**Building alone is slow.** Every decision — architecture, design, database schema, deployment, SEO — is mine to research, make, and live with. There's no one to catch my mistakes before they become problems.\n\n**I second-guess myself constantly.** Am I solving the right problem? Is this the correct abstraction? Should this be a hook or a context? These questions slow everything down.\n\n**Learning and building at the same time is exhausting.** Some days I spend more time reading documentation than writing code. That's fine — it's necessary — but it means progress is slower than I'd like.\n\n**The Indian proptech space is crowded.** There are players with funding, teams, and years of head start. I am one person. I'm not going to beat them by doing what they do. I have to build something more useful and more trustworthy than what exists.\n\n---\n\n## What I've Learned\n\n**Perfect architecture is a myth.** Every system has compromises. The goal is to build something that works, that you understand, and that can be improved. Inhaby v1.0 had many problems. v1.8 has fewer. Every version will have fewer than the last.\n\n**Write the plan before you write the code.** The times I've skipped this step, I've regretted it. When I write out what I'm going to build — what files change, what the success criteria are, what the failure modes are — the implementation goes faster and the bugs are smaller.\n\n**Read the error messages.** Completely, carefully, from top to bottom. Most of the bugs I've spent hours on were described exactly in the first line of the error.\n\n**Commit early and often.** I've lost work exactly once. Once was enough.\n\n**Ship it.** A finished product that's 80% of what you imagined is more valuable than a perfect product that doesn't exist.\n\n---\n\n## My Daily Engineering Routine\n\nMost days I start in the early afternoon and work until late at night. India Standard Time puts me in a different timezone from most of the developer communities I learn from, which means I often read the morning's Stack Overflow answers at 11pm.\n\nI keep an engineering log for every working session. Not for anyone else — for myself. Writing down what I did, what broke, and what I learned forces me to actually understand it rather than just move past it.\n\nI commit to Git at the end of every session with a descriptive message. The commit history is my changelog and my memory.\n\n---\n\n## Vision for Inhaby\n\nThe long-term vision for Inhaby is a complete, end-to-end rental operating system for India.\n\nToday: tenants find verified properties, book visits, and message owners.\n\nTomorrow: digital lease signing, rent payment processing, maintenance request management, tenancy history as a portable trust signal for future rentals.\n\nEventually: a reputation layer where verified tenants carry their rental history from property to property, and verified owners carry their responsiveness record from tenant to tenant.\n\nThe broker's role is to manufacture trust where none exists. If the platform creates real, verifiable trust — through history, reviews, verification, and guarantees — the broker becomes unnecessary. That's the goal.\n\n---\n\n## Philosophy Toward Product Building\n\nI believe products should do one thing better than anything else before they try to do everything. Inhaby's one thing is: connecting a tenant to a verified, brokerage-free rental. Everything else is secondary until that's genuinely excellent.\n\nI also believe in transparency. The engineering journal exists because I think the process of building — the struggles, the bugs, the 3am rebuilds — is as valuable to share as the final product. There are people trying to build products who would benefit from seeing what the middle of the journey actually looks like, not just the highlight reel.\n\nAnd I believe in being honest about limitations. Inhaby is not a finished product. It is a work in progress built by one person who is learning as he goes. I'd rather say that clearly and be trusted for it than present an image of completeness that isn't real.\n\n---\n\n## Related Articles\n\n- **Engineering:** [How We Built the @inhaby/shared GitHub Package](/blog/engineering/github-packages-inhaby)\n- **Engineering:** [Merging a Landing Page Into a Vite React App](/blog/engineering/landing-page-integration)\n- **Founder Journal:** [Day 003 — I Broke Everything, Then Fixed It Properly](/blog/founder-journal/day-003-rebuilding-architecture)\n\n---\n\n## FAQ\n\n**Q: Who is Genofogu?**\nA: Genofogu is the co-founder of Inhaby, a zero-brokerage property rental platform for India. He is the primary engineer building the platform, working across the tenant app, owner portal, admin panel, and shared infrastructure.\n\n**Q: What is Inhaby?**\nA: Inhaby is a platform that connects tenants directly with verified property owners, eliminating the broker fee from the rental process.\n\n**Q: Is Genofogu a professional software engineer?**\nA: Genofogu is a self-taught developer who learned to code while building Inhaby. He is transparent about learning on the job and documents that process in the Founder Journal.\n\n**Q: Where can I follow Inhaby's progress?**\nA: At /blog/founder-journal for personal reflections, and /blog/engineering for technical deep-dives.\n\n---\n\n## JSON-LD Recommendations\n\n```json\n{\n  \"@context\": \"https://schema.org\",\n  \"@type\": \"Person\",\n  \"name\": \"Genofogu\",\n  \"url\": \"https://inhaby.com/founder/genofogu\",\n  \"jobTitle\": \"Co-Founder\",\n  \"worksFor\": {\n    \"@type\": \"Organization\",\n    \"name\": \"Inhaby\",\n    \"url\": \"https://inhaby.com\",\n    \"description\": \"Zero-brokerage property rental platform for India\"\n  },\n  \"description\": \"Co-founder of Inhaby, building a zero-brokerage property rental platform in India.\",\n  \"sameAs\": []\n}\n```",
+  "seo": {
+    "seoTitle": "Who Is Genofogu? — Co-Founder of Inhaby, the Zero-Brokerage Rental Platform",
+    "seoSlug": "about-genofogu",
+    "metaTitle": "Who Is Genofogu? — Co-Founder of Inhaby, the Zero-Brokerage Rental Platform",
+    "metaDescription": "Meet Genofogu, the co-founder building Inhaby — a zero-brokerage property rental platform in India. An honest introduction: who he is, why he started Inhaby, and what he's learning.",
+    "openGraphTitle": "Who Is Genofogu? The Person Building Inhaby",
+    "openGraphDesc": "An honest founder introduction — not a press release. Who Genofogu is, why Inhaby exists, and what building a proptech startup from scratch actually looks like.",
+    "canonicalUrl": "https://inhaby.com/blog/founder-journal/about-genofogu",
+    "primaryCategory": "Founder Journal",
+    "secondaryCategory": "Startup Journey",
+    "tags": [
+      "founder",
+      "about",
+      "proptech",
+      "India",
+      "startup",
+      "zero brokerage",
+      "building in public"
+    ],
+    "readingTime": "6 minutes",
+    "publishedDate": "2026-07-03",
+    "updatedDate": "2026-07-03",
+    "targetAudience": "Startup Founders, React Developers, Aspiring Entrepreneurs",
+    "featuredImage": {
+      "url": "https://images.unsplash.com/photo-1531403009284-440f080d1e12?auto=format&fit=crop&q=80&w=1200",
+      "suggestion": "A photograph-style portrait of a young developer at a desk, looking thoughtfully at a monitor showing a property listing interface. The setting is modest — a home workspace, not a startup office.",
+      "alt": "Genofogu, co-founder of Inhaby, at his development workspace building the zero-brokerage rental platform."
+    },
+    "lsiKeywords": [
+      {
+        "word": "Genofogu",
+        "count": 2,
+        "type": "Primary Keyword"
+      },
+      {
+        "word": "Inhaby founder",
+        "count": 2,
+        "type": "Primary Keyword"
+      },
+      {
+        "word": "proptech startup India",
+        "count": 2,
+        "type": "Primary Keyword"
+      },
+      {
+        "word": "who is building Inhaby",
+        "count": 2,
+        "type": "Secondary Keyword"
+      },
+      {
+        "word": "zero brokerage rental startup founder India",
+        "count": 2,
+        "type": "Secondary Keyword"
+      },
+      {
+        "word": "building a proptech startup alone",
+        "count": 2,
+        "type": "Secondary Keyword"
+      }
+    ],
+    "geoAeoFeatures": [
+      {
+        "type": "Direct Answer (AEO)",
+        "desc": "Provides a direct explanation matching the key entities for search engines query optimization."
+      }
+    ]
+  }
+},
+  {
+  "id": "github-packages-inhaby-shared",
+  "slug": "github-packages-inhaby-shared",
+  "title": "How Inhaby Built a GitHub Shared Package to Unify Three React Applications",
+  "category": "Engineering",
+  "phase": "Phase 6 — Technology & Security Vetting",
+  "phaseNum": 6,
+  "description": "Learn how Inhaby built @inhaby/shared — a scoped TypeScript package published to GitHub Packages — to share a Supabase client, TypeScript types, and utilities across three independent React applications.",
+  "image": "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&q=80&w=1200",
+  "author": {
+    "name": "Genofogu",
+    "role": "Co-Founder of Inhaby",
+    "avatar": "GF",
+    "bio": "Genofogu is the Co-Founder at INHABY, focused on core engineering and scaling infrastructures to support millions of home seekers.",
+    "socials": {
+      "twitter": "https://twitter.com/inhaby",
+      "linkedin": "https://linkedin.com/company/inhaby"
+    }
+  },
+  "publishedDate": "2026-07-03",
+  "readingTime": "11 minutes",
+  "trending": false,
+  "popular": true,
+  "tags": [
+    "GitHub Packages",
+    "TypeScript",
+    "monorepo",
+    "Supabase",
+    "shared package",
+    "React",
+    "architecture",
+    "NPM",
+    "SDK"
+  ],
+  "content": "## The Problem: Three Apps, Three Copies of Everything\n\nWhen building a multi-surface platform — where tenants, property owners, and platform administrators each have their own dedicated application — the temptation is to copy and paste.\n\nThe Supabase client initialisation: copy it. The TypeScript type for `User`, `Property`, `Booking`: copy it. The auth helper that parses Supabase error messages into readable strings: copy it.\n\nThis works. Until it doesn't.\n\nA copied `User` interface in the tenant app diverges from the `User` interface in the owner portal. A bug fix in the auth helper gets applied to two out of three apps. A Supabase URL environment variable is named `VITE_SUPABASE_URL` in the tenant app but `REACT_APP_SUPABASE_URL` in the admin panel.\n\nThese aren't hypothetical problems. They are the concrete problems that emerge when you're moving fast and not thinking about long-term consistency.\n\nThe Inhaby platform consists of three independent React applications:\n\n1. **`inhaby-terent`** — the tenant-facing property discovery and rental management app\n2. **`owner-portal`** — the property owner's listing management and tenant communication app  \n3. **`admin-panel`** — the internal platform administration and moderation dashboard\n\nAll three needed the same Supabase client. All three needed the same TypeScript type definitions. All three shared common validation logic and storage helpers.\n\nThe solution was `@inhaby/shared`.\n\n---\n\n## What @inhaby/shared Is\n\n`@inhaby/shared` is a scoped TypeScript package published to the GitHub Packages registry. It is the single source of truth for:\n\n- **The Supabase client instance** — configured once, used everywhere\n- **TypeScript type definitions** — all data models for the platform: `User`, `Property`, `Booking`, `Visit`, `Conversation`, `Message`, `Notification`, and more\n- **Storage service** — wrapper for Supabase Storage file operations\n- **Auth helpers** — email validation, password validation, Supabase error message parsing\n\nEvery application installs it as a dependency and imports from it as `@inhaby/shared`.\n\n```typescript\nimport { supabase, User, Property, Booking } from '@inhaby/shared';\n```\n\nNo copies. No divergence. One package, rebuilt and reinstalled when changes are needed.\n\n---\n\n## Package Architecture\n\nThe package follows a flat-module structure with a single entry point:\n\n```\nInhaby-Shared/\n├── src/\n│   ├── types/\n│   │   ├── index.ts          ← All TypeScript data models\n│   │   └── env.d.ts          ← Vite environment variable type declarations\n│   ├── database/\n│   │   ├── supabaseClient.ts ← Supabase client initialisation\n│   │   └── storageService.ts ← File upload / signed URL helpers\n│   ├── utils/\n│   │   └── authHelpers.ts    ← Email/password validation, error parsing\n│   └── index.ts              ← Single barrel export\n├── dist/                     ← Compiled output (TypeScript → ESModule JS + .d.ts)\n├── tsconfig.json\n├── package.json\n└── .npmrc                    ← Registry configuration\n```\n\nThe `index.ts` barrel is minimal — it re-exports everything from each module:\n\n```typescript\nexport * from './types';\nexport * from './database/supabaseClient';\nexport * from './database/storageService';\nexport * from './utils/authHelpers';\n```\n\n---\n\n## Type System: All Platform Models in One Place\n\nThe most valuable part of `@inhaby/shared` is the type system. With 239 lines covering every entity on the platform, it ensures that every application speaks the same data language.\n\nKey type definitions include:\n\n```typescript\nexport type UserRoleName = 'super_admin' | 'admin' | 'owner' | 'tenant';\n\nexport interface User {\n  id: string;\n  email: string;\n  name: string;\n  phone: string;\n  avatarUrl: string;\n  role: UserRoleName;\n  isActive: boolean;\n  createdAt: string;\n  lastLogin?: string;\n}\n\nexport type BookingStatus = 'pending' | 'confirmed' | 'active' | 'completed' | 'cancelled';\n\nexport interface Booking {\n  id: string;\n  propertyId: string;\n  tenantId: string;\n  startDate: string;\n  endDate?: string;\n  rentAmount: number;\n  depositAmount: number;\n  status: BookingStatus;\n  paymentMethod?: string;\n  createdAt: string;\n}\n```\n\nWhen a `Booking` record is fetched from Supabase in the tenant app and displayed in the owner portal, both applications are working from identical type contracts. TypeScript's compiler enforces this at build time — if the shared type changes, every consuming application gets a compile error until it's updated.\n\n---\n\n## The Supabase Client: Configured Once\n\nThe client initialisation in `supabaseClient.ts` handles a practical problem: different Supabase deployments sometimes use differently-named environment variables. The implementation accepts either `VITE_SUPABASE_ANON_KEY` or `VITE_SUPABASE_PUBLISHABLE_KEY` to be resilient across environments:\n\n```typescript\nimport { createClient } from '@supabase/supabase-js';\n\nconst supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';\nconst supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY \n  || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY \n  || '';\n\nif (!supabaseUrl || !supabaseAnonKey) {\n  console.warn(\n    'Supabase environment variables are missing! Ensure VITE_SUPABASE_URL and either ' +\n    'VITE_SUPABASE_ANON_KEY or VITE_SUPABASE_PUBLISHABLE_KEY are set in your .env file.'\n  );\n}\n\nexport const supabase = createClient(supabaseUrl, supabaseAnonKey);\nexport default supabase;\n```\n\nEach consuming application sets its own `.env` file — the shared package picks up the correct values through Vite's `import.meta.env` at build time. Each application can have independent Supabase project URLs for complete environment separation.\n\n---\n\n## Publishing to GitHub Packages\n\nThe package is scoped to the `@inhaby` organisation and published to the GitHub Packages npm registry.\n\n### Registry configuration (`.npmrc`)\n\n```\n@inhaby:registry=https://npm.pkg.github.com\n//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}\n```\n\nThe `NODE_AUTH_TOKEN` environment variable must be set to a GitHub Personal Access Token (PAT) with `read:packages` scope for installation and `write:packages` scope for publishing.\n\n### `package.json` publish configuration\n\n```json\n{\n  \"name\": \"@inhaby/shared\",\n  \"version\": \"1.0.0\",\n  \"main\": \"./dist/index.js\",\n  \"module\": \"./dist/index.js\",\n  \"types\": \"./dist/index.d.ts\",\n  \"exports\": {\n    \".\": {\n      \"types\": \"./dist/index.d.ts\",\n      \"import\": \"./dist/index.js\",\n      \"default\": \"./dist/index.js\"\n    }\n  },\n  \"publishConfig\": {\n    \"registry\": \"https://npm.pkg.github.com\"\n  },\n  \"files\": [\"dist\"]\n}\n```\n\nThe `exports` map ensures that TypeScript resolvers find type declarations (`.d.ts`) automatically. The `files` field limits the published content to the compiled `dist/` directory — source files are not published.\n\n### Build command\n\n```bash\nnpm run build   # runs tsc\n```\n\nTypeScript compiles `src/` into `dist/` — both `.js` module files and `.d.ts` declaration files are generated. The `tsconfig.json` sets `\"declaration\": true` and `\"declarationMap\": true` for full type information in consuming applications.\n\n---\n\n## Installing in Consuming Applications\n\nDuring development, the package can be installed from a local path (useful before a version is published):\n\n```json\n\"dependencies\": {\n  \"@inhaby/shared\": \"file:../Inhaby-Shared\"\n}\n```\n\nOr, once published to GitHub Packages:\n\n```bash\nnpm install github:genofogu/Inhaby-Shared\n```\n\nConsuming applications require their own `.npmrc` pointing to the GitHub Packages registry with authentication configured. This is set once per development machine or CI environment.\n\n---\n\n## Architecture Diagram\n\n```\nInhaby Platform Architecture\n─────────────────────────────\n\n  ┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐\n  │  inhaby-terent  │   │  owner-portal   │   │  admin-panel    │\n  │  (Tenant App)   │   │  (Owner App)    │   │  (Admin App)    │\n  └────────┬────────┘   └────────┬────────┘   └────────┬────────┘\n           │                     │                       │\n           └──────────┬──────────┘                       │\n                      └───────────────┬──────────────────┘\n                                      │\n                             @inhaby/shared\n                          ┌────────────────────┐\n                          │  supabase client   │\n                          │  TypeScript types  │\n                          │  storage service   │\n                          │  auth helpers      │\n                          └────────────────────┘\n                                      │\n                              Supabase Backend\n                          ┌────────────────────┐\n                          │  PostgreSQL DB      │\n                          │  Auth              │\n                          │  Storage           │\n                          │  Realtime          │\n                          └────────────────────┘\n```\n\n---\n\n## Challenges\n\n### Challenge 1: `import.meta.env` in a Shared Package\n\nVite processes `import.meta.env` at build time in each consuming application. This means the shared package's `supabaseClient.ts` correctly resolves environment variables from the **consuming application's** `.env` file — not from a `.env` in the shared package itself.\n\nThis is the intended behaviour, but it's non-obvious. The shared package should never contain environment values directly. It should always read from `import.meta.env`, trusting the consuming application to provide them.\n\n**Lesson:** Shared packages that use `import.meta.env` must document clearly that the consuming application is responsible for environment variable configuration.\n\n### Challenge 2: TypeScript `moduleResolution` for ESM Packages\n\nWith `\"module\": \"ESNext\"` and `\"moduleResolution\": \"bundler\"` in the shared package's `tsconfig.json`, consuming applications using older module resolution strategies (`node`, `node16`) may fail to resolve the package.\n\nThe solution was ensuring every consuming application's Vite config was set to use the same `bundler` resolution strategy, which is the default in Vite 4+.\n\n### Challenge 3: Keeping the dist/ Folder Committed\n\nDuring early development, the `dist/` folder must be committed to the repository when consuming applications install with `file:../Inhaby-Shared` path references. Applications importing from a local path need the compiled output present.\n\nFor GitHub Packages releases, this is less relevant — `npm publish` runs the build first and only publishes `dist/`. But locally, forgetting to rebuild the package after making changes is a common source of confusion where changes don't appear in consuming applications.\n\n**Lesson:** Add a `prepare` script to automatically build before install: `\"prepare\": \"npm run build\"`.\n\n---\n\n## Common Mistakes\n\n| Mistake | Impact | Fix |\n|---|---|---|\n| Importing from `@inhaby/shared` without rebuilding after changes | Changes don't appear in consuming apps | Always run `npm run build` in the shared package and `npm install` in consuming apps after changes |\n| Missing `NODE_AUTH_TOKEN` in environment | `npm install` fails for GitHub Packages scoped packages | Set the token in `.env` or CI environment secrets |\n| Forgetting `\"types\"` in `exports` map | TypeScript cannot find type declarations | Add `\"types\": \"./dist/index.d.ts\"` to the `exports` entry |\n| Putting `.env` values directly in the shared package | Credentials leak into source | Always use `import.meta.env` and let consuming apps provide values |\n\n---\n\n## Lessons Learned\n\n**1. Shared packages pay dividends immediately.**\n\nThe first time a type change in the platform propagated to all three apps through a single edit to `@inhaby/shared`, it was clear this was the right architecture. Without the shared package, the same change would require three edits, three code reviews, and the risk of the third app missing the update entirely.\n\n**2. The package boundary forces good design.**\n\nWhen code lives in a shared package, you think more carefully about its API surface. You can't just add a parameter to a function and rely on the rest of the codebase updating itself. The module boundary creates healthy friction.\n\n**3. Local path dependencies are fine for small teams.**\n\nGitHub Packages authentication adds friction. During active early development, `\"@inhaby/shared\": \"file:../Inhaby-Shared\"` is simpler and faster. Migrate to the registry when CI/CD pipelines require it.\n\n**4. Type-only exports are valuable.**\n\nThe `@inhaby/shared` package exports type definitions that carry zero runtime cost — pure TypeScript interfaces. This means the package can be safely imported in any environment without adding bundle weight beyond the actual runtime code (`supabase.ts`, `storageService.ts`, `authHelpers.ts`).\n\n---\n\n## Future Improvements\n\n- **Versioned releases** — Semantic versioning with a changelog so consuming applications can pin to stable versions and upgrade intentionally\n- **CI/CD build pipeline** — Automated build and publish to GitHub Packages on merge to `main`\n- **Expanded utilities** — Date formatters, currency formatters, and address string builders that are currently duplicated across applications\n- **React hooks in the shared package** — `useSupabaseQuery` and `useSupabaseRealtime` hooks that implement standard data-fetching patterns, usable in all three applications\n- **Schema validation** — Zod schemas co-located with TypeScript types for runtime validation as well as compile-time checking\n\n---\n\n## FAQ\n\n**Q: What is GitHub Packages?**\nA: GitHub Packages is a package registry integrated with GitHub. It supports npm, Docker, Maven, and other package formats. Scoped npm packages (like `@inhaby/shared`) can be published and installed with standard npm commands, authenticated via GitHub Personal Access Tokens.\n\n**Q: Can @inhaby/shared be installed without a GitHub account?**\nA: No. GitHub Packages requires authentication with a PAT (Personal Access Token) with `read:packages` scope even for public packages. This is a known limitation compared to the public npm registry.\n\n**Q: Why not publish to the public npm registry instead?**\nA: GitHub Packages is tightly integrated with the Inhaby GitHub organisation, making access control simpler. A public npm registry package would also require a unique global package name and has no authentication requirement, which may not be appropriate for a platform-internal SDK.\n\n**Q: How does the Supabase client get different credentials in different environments?**\nA: Each consuming application (inhaby-terent, owner-portal, admin-panel) has its own `.env` file with its own Supabase project credentials. The shared package reads from `import.meta.env` at build time, so each application's build produces a client configured for its own environment.\n\n**Q: What happens when a type in @inhaby/shared changes?**\nA: All consuming applications that import the changed type will get a TypeScript compile error until they update their usage to match the new type signature. This is intentional — it prevents silent mismatches across applications.\n\n---\n\n## Suggested Internal Links\n\n- [About Inhaby](/about)\n- [Founder Journal: Day 003](/blog/founder-journal/day-003-rebuilding-architecture)\n- [Landing Page Integration Architecture](/blog/engineering/landing-page-integration)\n- [Engineering Blog](/blog/engineering)\n\n## Suggested External References\n\n- [GitHub Packages documentation](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-npm-registry)\n- [Supabase JavaScript client](https://supabase.com/docs/reference/javascript/introduction)\n- [TypeScript project references](https://www.typescriptlang.org/docs/handbook/project-references.html)\n- [npm scoped packages](https://docs.npmjs.com/cli/v10/using-npm/scope)\n\n---\n\n## Suggested Social Caption\n\n> \"Three React apps. One Supabase backend. One shared TypeScript package published to GitHub Packages. Here's how @inhaby keeps its type system consistent across every application in the platform — and why this architecture pays off immediately. 🧵 #TypeScript #React #GitHub #proptech\"\n\n---\n\n## Related Articles\n\n- **Previous:** [Who Is Genofogu?](/blog/founder-journal/about-genofogu)\n- **Next:** [Merging a Landing Page Into a React App — The Right Way](/blog/engineering/landing-page-integration)\n- **Suggested Reading:** [Founder Journal Day 003](/blog/founder-journal/day-003-rebuilding-architecture)\n\n---\n\n## JSON-LD Recommendations\n\n```json\n{\n  \"@context\": \"https://schema.org\",\n  \"@type\": \"TechArticle\",\n  \"headline\": \"How Inhaby Built a GitHub Shared Package to Unify Three React Applications\",\n  \"description\": \"A practical walkthrough of @inhaby/shared — the scoped TypeScript package that powers the Inhaby platform's Supabase client, type system, and shared utilities across every application.\",\n  \"author\": {\n    \"@type\": \"Person\",\n    \"name\": \"Genofogu\",\n    \"url\": \"https://inhaby.com/founder/genofogu\",\n    \"jobTitle\": \"Co-Founder\"\n  },\n  \"publisher\": {\n    \"@type\": \"Organization\",\n    \"name\": \"Inhaby\",\n    \"url\": \"https://inhaby.com\"\n  },\n  \"datePublished\": \"2026-07-03\",\n  \"dateModified\": \"2026-07-03\",\n  \"mainEntityOfPage\": {\n    \"@type\": \"WebPage\",\n    \"@id\": \"https://inhaby.com/blog/engineering/github-packages-inhaby-shared\"\n  },\n  \"keywords\": \"GitHub Packages, TypeScript, monorepo, Supabase, shared package, React, npm\",\n  \"articleSection\": \"Engineering\"\n}\n```\n\n```json\n{\n  \"@context\": \"https://schema.org\",\n  \"@type\": \"FAQPage\",\n  \"mainEntity\": [\n    {\n      \"@type\": \"Question\",\n      \"name\": \"What is GitHub Packages?\",\n      \"acceptedAnswer\": {\n        \"@type\": \"Answer\",\n        \"text\": \"GitHub Packages is a package registry integrated with GitHub that supports npm, Docker, and other package formats. Scoped npm packages can be published and installed with standard npm commands, authenticated via GitHub Personal Access Tokens.\"\n      }\n    },\n    {\n      \"@type\": \"Question\",\n      \"name\": \"How does the Supabase client get different credentials in different environments?\",\n      \"acceptedAnswer\": {\n        \"@type\": \"Answer\",\n        \"text\": \"Each consuming application has its own .env file with its own Supabase project credentials. The shared package reads from import.meta.env at build time, so each application's build produces a client configured for its own environment.\"\n      }\n    },\n    {\n      \"@type\": \"Question\",\n      \"name\": \"What happens when a type in @inhaby/shared changes?\",\n      \"acceptedAnswer\": {\n        \"@type\": \"Answer\",\n        \"text\": \"All consuming applications that import the changed type will get a TypeScript compile error until they update their usage to match the new type signature, preventing silent mismatches across applications.\"\n      }\n    }\n  ]\n}\n```",
+  "seo": {
+    "seoTitle": "How to Build a Shared GitHub Package for a Multi-App React Monorepo — The Inhaby Case Study",
+    "seoSlug": "github-packages-inhaby-shared",
+    "metaTitle": "How to Build a Shared GitHub Package for a Multi-App React Monorepo — The Inhaby Case Study",
+    "metaDescription": "Learn how Inhaby built @inhaby/shared — a scoped TypeScript package published to GitHub Packages — to share a Supabase client, TypeScript types, and utilities across three independent React applications.",
+    "openGraphTitle": "@inhaby/shared: Building a GitHub Packages Shared SDK for a Multi-App React Monorepo",
+    "openGraphDesc": "How Inhaby solved shared Supabase configuration, duplicate TypeScript types, and cross-app utility chaos with a single scoped package published to GitHub Packages.",
+    "canonicalUrl": "https://inhaby.com/blog/engineering/github-packages-inhaby-shared",
+    "primaryCategory": "Engineering",
+    "secondaryCategory": "Monorepo & Shared SDK",
+    "tags": [
+      "GitHub Packages",
+      "TypeScript",
+      "monorepo",
+      "Supabase",
+      "shared package",
+      "React",
+      "architecture",
+      "NPM",
+      "SDK"
+    ],
+    "readingTime": "11 minutes",
+    "publishedDate": "2026-07-03",
+    "updatedDate": "2026-07-03",
+    "targetAudience": "Software Engineers, Technical Architects, React Monorepo Developers",
+    "featuredImage": {
+      "url": "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&q=80&w=1200",
+      "suggestion": "Three React application windows shown side-by-side in a browser, each with a different UI — the tenant app, owner portal, and admin panel — and an arrow pointing from all three to a single box labeled `@inhaby/shared`.",
+      "alt": "Three Inhaby React applications (tenant app, owner portal, admin panel) all importing from one shared @inhaby/shared package."
+    },
+    "lsiKeywords": [
+      {
+        "word": "GitHub Packages React",
+        "count": 2,
+        "type": "Primary Keyword"
+      },
+      {
+        "word": "shared TypeScript package monorepo",
+        "count": 2,
+        "type": "Primary Keyword"
+      },
+      {
+        "word": "@inhaby/shared",
+        "count": 2,
+        "type": "Primary Keyword"
+      },
+      {
+        "word": "Supabase shared client",
+        "count": 2,
+        "type": "Primary Keyword"
+      },
+      {
+        "word": "how to publish a scoped npm package to GitHub Packages",
+        "count": 2,
+        "type": "Secondary Keyword"
+      },
+      {
+        "word": "shared Supabase client multiple React apps",
+        "count": 2,
+        "type": "Secondary Keyword"
+      },
+      {
+        "word": "TypeScript monorepo shared package",
+        "count": 2,
+        "type": "Secondary Keyword"
+      },
+      {
+        "word": "GitHub Packages authentication token setup",
+        "count": 2,
+        "type": "Secondary Keyword"
+      }
+    ],
+    "geoAeoFeatures": [
+      {
+        "type": "Direct Answer (AEO)",
+        "desc": "Provides a direct explanation matching the key entities for search engines query optimization."
+      }
+    ]
+  }
+},
+  {
+  "id": "landing-page-integration",
+  "slug": "landing-page-integration",
+  "title": "How Inhaby Merged a Landing Page Into a Vite React App — Without Breaking Authentication",
+  "category": "Engineering / Architecture",
+  "phase": "Phase 6 — Technology & Security Vetting",
+  "phaseNum": 6,
+  "description": "Inhaby's engineering team walks through the v1.8 refactor: how to properly separate a public landing website from an authenticated React app inside one Vite project, fix React provider ordering bugs, and guarantee clean logout state.",
+  "image": "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&q=80&w=1200",
+  "author": {
+    "name": "Genofogu",
+    "role": "Co-Founder of Inhaby",
+    "avatar": "GF",
+    "bio": "Genofogu is the Co-Founder at INHABY, focused on core engineering and scaling infrastructures to support millions of home seekers.",
+    "socials": {
+      "twitter": "https://twitter.com/inhaby",
+      "linkedin": "https://linkedin.com/company/inhaby"
+    }
+  },
+  "publishedDate": "2026-07-03",
+  "readingTime": "14 minutes",
+  "trending": false,
+  "popular": true,
+  "tags": [
+    "React",
+    "Vite",
+    "authentication",
+    "routing",
+    "architecture",
+    "Supabase",
+    "refactor",
+    "ProtectedRoute",
+    "context providers",
+    "logout"
+  ],
+  "content": "## The Problem That Started Everything\n\nWhen a product grows by adding features, the codebase grows with it — sometimes in directions that made sense at the time but create structural problems later.\n\nInhaby's tenant application started as a dashboard. Then a landing page was added. Then both surfaces needed to share authentication, Supabase configuration, and component utilities. The simplest path was to put everything into one Vite project, mount all providers at the root, and handle both public and private routes in one router file.\n\nThis is how v1.7 was born. And this is exactly what created the problems v1.8 had to fix.\n\n---\n\n## The v1.7 Problem Diagnosis\n\n### Problem 1: Providers Mounted Globally\n\nIn v1.7, the application structure at `main.tsx` looked like this:\n\n```tsx\n// v1.7 main.tsx\ncreateRoot(document.getElementById('root')!).render(\n  <StrictMode>\n    <ThemeProvider>\n      <AuthProvider>        {/* ← mounted on the landing page */}\n        <AppStateProvider>  {/* ← mounted on the landing page */}\n          <App />\n        </AppStateProvider>\n      </AuthProvider>\n    </ThemeProvider>\n  </StrictMode>\n);\n```\n\nEvery time a guest visited the landing page at `/`, `AuthProvider` was initialising — running a Supabase session check, setting up an `onAuthStateChange` listener, and returning a React context that the landing page didn't use. `AppStateProvider` was spinning up hooks for notifications, wishlist, visits, bookings, and messages — all for an anonymous visitor.\n\nThis was wasteful and incorrect. The landing page is a public surface. It should have no authentication overhead.\n\n### Problem 2: Stale Authenticated State After Logout\n\nEvery hook that fetched user data — `useNotifications`, `useWishlist`, `useVisits`, `useBookings`, `useMessages` — subscribed to the `user` object through a `useEffect`. When the user logged out, `signOut()` cleared the Supabase session and set `user = null` in the auth context.\n\nBut the hooks had a bug. Their `useEffect` looked like this:\n\n```typescript\n// v1.7 (buggy)\nuseEffect(() => {\n  fetchNotifications();\n}, [user]);\n```\n\nWhen `user` became `null`, the `useEffect` fired — but it just called `fetchNotifications()`, which would fail (no user to fetch for) and resolve with an empty result. Critically, **the existing state was never explicitly cleared**. Until the fetch resolved, the previous user's notifications, wishlist items, and visit requests remained visible in the UI.\n\nIn React DevTools after logout, you could still see the previous user's profile data in the context providers.\n\n### Problem 3: The 1,114-Line Monolith\n\nThe router file — `src/router/AppRouter.tsx` — had grown to 1,114 lines. It handled:\n- Public landing page routes\n- Guest-only auth routes (login, signup, forgot password)\n- Authenticated dashboard routes\n- Property detail routes (both public and private variants)\n- Auth guards with inconsistent implementation\n\nThere was no clean separation between what was public and what required authentication. This made maintenance difficult and made the auth guard logic hard to reason about.\n\n### Problem 4: The Landing Page Header Used an External URL\n\nThe landing page navbar pointed to `https://inhaby.com/login` for the Login button — a hardcoded external URL rather than an internal React Router `<Link to=\"/login\">`. This caused a full page reload on login navigation, losing any React state, and broke the single-page-application navigation model.\n\n---\n\n## The v1.8 Solution: Two Independent React Sub-Trees\n\nThe core insight behind v1.8 is simple:\n\n> **A React context provider should only be mounted where its consumers live.**\n\nIf `AuthProvider` is only consumed by the authenticated tenant application, it should only be mounted inside the authenticated tenant application — not above the entire router.\n\n### The New Architecture\n\n```\nmain.tsx\n  ThemeProvider            ← only truly global concern: theming\n    BrowserRouter\n      RootRouter\n        \"/\" → LandingApp           ← no auth context\n        \"/login\" → LoginPage       ← no auth context (checks session directly)\n        \"/app/*\" → ProtectedRoute\n                     TenantApp\n                       AuthProvider     ← mounted only for /app\n                         AppStateProvider ← mounted only for /app\n                           AppRouter\n                             AppShell\n                               AppHeader\n                               <Outlet />\n```\n\nThe `RootRouter` splits all traffic into three zones:\n\n| Zone | Path | Context providers | Who can access |\n|---|---|---|---|\n| Landing | `/`, `/demo`, `/pricing`, `/blog`, etc. | `ThemeProvider` only | Everyone |\n| Auth | `/login`, `/signup`, `/forgot-password`, `/reset-password` | `ThemeProvider` only | Guests only (redirect if session exists) |\n| App | `/app/*` | `ThemeProvider` + `AuthProvider` + `AppStateProvider` | Authenticated users only |\n\n---\n\n## The ProtectedRoute Problem: A Critical Ordering Bug\n\nThe most common mistake when implementing this pattern is writing a `ProtectedRoute` that calls `useAuth()`:\n\n```tsx\n// ❌ WRONG — will crash\nexport const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {\n  const { user, loading } = useAuth(); // ← cannot work: AuthProvider is a child, not a parent\n  // ...\n};\n```\n\nThis crashes with: **`useAuth must be used within an AuthProvider`**\n\nWhy? Because `AuthProvider` lives **inside** `TenantApp`, which is the *child* that `ProtectedRoute` is guarding. The context doesn't exist above the guard — it exists inside the guarded content.\n\nThe correct implementation reads Supabase directly, the same way the `GuestRoute` (which guards the login/signup pages) works:\n\n```tsx\n// ✅ CORRECT\nexport const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {\n  const [loading, setLoading] = useState(true);\n  const [hasSession, setHasSession] = useState(false);\n  const location = useLocation();\n\n  useEffect(() => {\n    // Read Supabase directly — no React context required\n    supabase.auth.getSession().then(({ data: { session } }) => {\n      setHasSession(!!session);\n      setLoading(false);\n    });\n\n    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {\n      setHasSession(!!session);\n      if (!session) setLoading(false);\n    });\n\n    return () => { subscription.unsubscribe(); };\n  }, []);\n\n  if (loading) return <Spinner />;\n  \n  if (!hasSession) {\n    // Preserve intended destination for post-login redirect\n    return <Navigate to=\"/\" state={{ from: location }} replace />;\n  }\n\n  return <>{children}</>;\n};\n```\n\nThe key: `ProtectedRoute` is a **pre-context** component. It runs before any auth context exists. It must use Supabase's SDK directly.\n\n---\n\n## The Logout Guarantee: Two Layers\n\nLogout is one of the hardest things to get right in a React auth system. Inhaby v1.8 uses a two-layer approach.\n\n### Layer 1: Architectural Guarantee (Primary)\n\nBecause `AuthProvider` and `AppStateProvider` are mounted **inside** `TenantApp`, and `TenantApp` is a child of `ProtectedRoute`, when logout navigates to `/`, React unmounts the entire `TenantApp` sub-tree.\n\nWhen a component tree unmounts:\n- All `useState` values are destroyed\n- All `useEffect` cleanup functions run (unsubscribing from Supabase Realtime, clearing intervals, etc.)\n- All context values are garbage collected\n- All hook closures are released\n\nNo explicit cleanup code is needed. The architecture provides the guarantee automatically.\n\n### Layer 2: Hook-Level Explicit Clearing (Defence in Depth)\n\nThere is a brief race window between `signOut()` resolving and React completing the unmount cycle. During this window, a stale render could serve old data. To prevent this, every hook explicitly clears its state when `user` becomes `null`:\n\n```typescript\n// useNotifications.ts\nuseEffect(() => {\n  if (!user) {\n    setNotifications([]); // ← explicit clear\n    return;\n  }\n  fetchNotifications();\n}, [user]);\n```\n\nAll five data hooks received this treatment:\n\n| Hook | State cleared on `user → null` |\n|---|---|\n| `useNotifications` | `setNotifications([])` |\n| `useWishlist` | `setSavedIds(new Set())` |\n| `useVisits` | `setVisitRequests([])` |\n| `useBookings` | `setActiveTenancy(null)`, `setPendingBookings([])`, `setPastBookings([])` |\n| `useMessages` | `setUnreadChatsCount(0)`, `setOpenMsgPropertyId(null)`, `setIsMobileChatActive(false)` |\n\n`AppContext.tsx` also received a cleanup `useEffect` for non-hook state (location, booking modal, search query, and localStorage keys):\n\n```typescript\nuseEffect(() => {\n  if (!user) {\n    setActiveLocation({ name: '', area: '', city: '', pincode: '' });\n    setIsBookVisitModalOpen(false);\n    setBookingPropertyId(null);\n    setChosenBookingMsg('');\n    setSearchQuery('');\n    localStorage.removeItem('homstay-active-location');\n    localStorage.removeItem('homstay-recent-viewed');\n  }\n}, [user]);\n```\n\n---\n\n## The Logout Sequence (Complete)\n\nWhen a user clicks Logout in the Inhaby tenant app, the following sequence occurs:\n\n```\n1. supabase.auth.signOut()\n   → Invalidates session on Supabase server\n   → Clears sb-* keys from localStorage\n\n2. AuthContext sets user = null, profile = null\n\n3. Hooks detect user → null (Layer 2)\n   → useNotifications: setNotifications([])\n   → useWishlist: setSavedIds(new Set())\n   → useVisits: setVisitRequests([])\n   → useBookings: clears tenancy and booking arrays\n   → useMessages: clears chat count and active state\n\n4. AppContext detects user → null (Layer 2)\n   → Clears location, booking modal, search state\n   → Removes localStorage keys\n\n5. navigate('/') executes\n   → React Router navigates to root\n\n6. ProtectedRoute re-evaluates\n   → supabase.auth.getSession() returns null\n   → hasSession = false\n   → Renders <Navigate to=\"/\" replace />\n\n7. React unmounts TenantApp tree (Layer 1)\n   → AuthProvider unmounted\n   → AppStateProvider unmounted\n   → All hooks destroyed\n   → All Supabase subscriptions unsubscribed\n   → All memory freed\n\n8. LandingApp mounts\n   → No auth context\n   → Guest experience\n```\n\n---\n\n## Header Ownership: A Hard Architectural Contract\n\nOne of the less-obvious decisions in the refactor was formalising the header ownership contract. Two headers exist:\n\n| Header | File location | Allowed in | Forbidden in |\n|---|---|---|---|\n| `LandingHeader` | `src/landing/components/LandingHeader.tsx` | Landing pages only | App shell, authenticated routes |\n| `AppHeader` | `src/app/layouts/AppHeader.tsx` | AppShell only | Landing pages, landing router |\n\nThis is enforced by file location. `LandingHeader` is in `src/landing/` — a directory with no dependency on `AppContext`. It cannot import anything from `src/app/`. `AppHeader` is in `src/app/layouts/` — it can depend on `AppContext` and authenticated-only hooks.\n\nThe `LandingHeader` is self-contained:\n- Uses `supabase.auth.getSession()` directly (no auth context)\n- If a session exists: shows an \"Open App →\" button linking to `/app`\n- If no session: shows Login (`<Link to=\"/login\">`) and Signup (`<Link to=\"/signup\">`) links\n- No notifications badge, wishlist count, or profile dropdown\n\n---\n\n## SEO Considerations: Two Surfaces, Two Strategies\n\nThe architectural separation has direct SEO implications.\n\n**Landing pages** (`/`, `/pricing`, `/blog`, `/demo`, etc.) are fully server-renderable. They contain no auth-gated content. They should be indexed with standard meta tags, Open Graph data, and structured data (Organization, FAQPage, BlogPosting). The landing surface is the SEO surface.\n\n**App pages** (`/app/*`) are authenticated. Search engines should not index them. All `/app/*` routes should include:\n\n```html\n<meta name=\"robots\" content=\"noindex, nofollow\" />\n```\n\nAnd Supabase's public auth callback route (`/auth/callback`) should similarly be excluded from indexing.\n\nThe architectural separation — landing at `/`, app at `/app/*` — makes this robots policy trivially easy to implement: block `*/app/*` in `robots.txt`, and allow everything else.\n\n```\n# robots.txt\nUser-agent: *\nDisallow: /app/\nDisallow: /auth/\n\nSitemap: https://inhaby.com/sitemap.xml\n```\n\n---\n\n## File Change Summary\n\n### New Files\n\n| File | Purpose |\n|---|---|\n| `src/router/RootRouter.tsx` | Top-level route split: landing vs auth vs app |\n| `src/auth/ProtectedRoute.tsx` | Auth guard using Supabase directly (no useAuth) |\n| `src/auth/OAuthCallback.tsx` | Handles Supabase OAuth redirect completion |\n| `src/landing/LandingApp.tsx` | Landing layout shell (LandingHeader + Footer + Outlet) |\n| `src/landing/components/LandingHeader.tsx` | Public-only header with internal React Router links |\n| `src/app/App.tsx` | TenantApp: mounts AuthProvider + AppStateProvider |\n| `src/app/router/AppRouter.tsx` | Dashboard routes extracted from old monolith |\n| `src/app/layouts/AppShell.tsx` | Sidebar + AppHeader + BottomNav + Outlet |\n| `src/app/layouts/AppHeader.tsx` | Authenticated header assembling existing components |\n\n### Modified Files\n\n| File | Change |\n|---|---|\n| `src/main.tsx` | Remove AuthProvider, AppStateProvider from root |\n| `src/app/AppContext.tsx` | Add logout reset useEffect + useBookings integration |\n| `src/hooks/useNotifications.ts` | Clear state on user → null |\n| `src/hooks/useWishlist.ts` | Clear state on user → null |\n| `src/hooks/useVisits.ts` | Clear state on user → null |\n| `src/hooks/useBookings.ts` | Clear state on user → null |\n| `src/hooks/useMessages.ts` | Clear state on user → null |\n\n### Deleted Files\n\n| File | Reason |\n|---|---|\n| `src/layouts/PublicLayout.tsx` | Replaced by `LandingApp.tsx` |\n| `src/router/AppRouter.tsx` (1114-line monolith) | Split into `RootRouter.tsx` + `AppRouter.tsx` |\n\n---\n\n## Build Verification\n\nAfter all changes were applied, the project was verified with:\n\n```bash\nnpx tsc --noEmit   # Zero TypeScript errors\nnpm run build      # ✓ built in 21.36s, 2388 modules transformed\n```\n\nNo TypeScript errors. No build failures. The refactor is additive — no existing component was rewritten, no UI was changed. Only routing, layout wrappers, and provider placement changed.\n\n---\n\n## Architecture Diagram: Before and After\n\n```\nBEFORE (v1.7)\n─────────────\nmain.tsx\n└── ThemeProvider\n    └── AuthProvider         ← GLOBAL (runs on landing page)\n        └── AppStateProvider ← GLOBAL (runs on landing page)\n            └── BrowserRouter\n                └── AppRouter (1114 lines)\n                    ├── PublicLayout\n                    │   ├── Route: /\n                    │   ├── Route: /demo\n                    │   └── Route: /pricing\n                    ├── Route: /login\n                    ├── Route: /signup\n                    └── DashboardLayout (auth guard inline)\n                        ├── Route: /app\n                        ├── Route: /app/wishlist\n                        └── ...\n\nAFTER (v1.8)\n────────────\nmain.tsx\n└── ThemeProvider\n    └── BrowserRouter\n        └── RootRouter\n            ├── Route: /  →  LandingApp\n            │                 └── LandingHeader\n            │                     LandingRoutes\n            │                     Footer\n            │\n            ├── GuestRoute: /login, /signup, ...\n            │   └── LoginPage / SignupPage / ...\n            │\n            └── ProtectedRoute: /app/*\n                └── TenantApp\n                    └── AuthProvider    ← SCOPED to /app\n                        └── AppStateProvider ← SCOPED to /app\n                            └── AppRouter\n                                └── AppShell\n                                    ├── AppHeader\n                                    ├── Sidebar\n                                    ├── BottomNav\n                                    └── AppRoutes\n```\n\n---\n\n## Common Mistakes and How to Avoid Them\n\n| Mistake | Symptom | Fix |\n|---|---|---|\n| Calling `useAuth()` inside `ProtectedRoute` | `useAuth must be used within an AuthProvider` crash | Read Supabase directly via `getSession()` in `ProtectedRoute` |\n| Leaving `AuthProvider` at root level | Auth state initialises on landing page; logout doesn't fully unmount | Move `AuthProvider` inside the authenticated sub-tree |\n| Not clearing hook state on `user → null` | Previous user's data visible briefly after logout | Add `if (!user) { clearState(); return; }` to every hook's `useEffect([user])` |\n| Using hardcoded external URLs in landing page nav | Full page reload on login/signup navigation | Replace external links with `<Link to=\"/login\">` from React Router |\n| Sharing the same header component between landing and app | Auth state bleeds into landing page header | Create separate `LandingHeader` and `AppHeader` in separate directories |\n\n---\n\n## Lessons Learned\n\n**1. Providers as close to consumers as possible is not a guideline — it's a correctness requirement.**\n\nMounting `AuthProvider` globally wasn't just inefficient. It created the stale logout state bug and the incorrect auth overhead on public pages. The principle \"mount providers where their consumers are\" is a correctness constraint, not a performance optimisation.\n\n**2. A `ProtectedRoute` that uses auth context is architecturally impossible when that context is inside the protected sub-tree.**\n\nThis sounds obvious. It is not obvious until you make the mistake. The rule: if a guard wraps a provider, the guard cannot use that provider. Read Supabase directly instead.\n\n**3. Monolithic router files are a maintenance risk.**\n\nA 1,114-line file that handles public routing, auth routing, and dashboard routing cannot be understood at a glance. When it needs to change, every change is a potential regression. Split router files by concern, not by size.\n\n**4. Architecture is the most reliable cleanup mechanism.**\n\nYou can write cleanup code in every hook. Or you can structure the component tree so that cleanup happens automatically when the tree unmounts. The architectural approach requires no explicit cleanup code and has no race conditions.\n\n**5. The build is the final arbiter.**\n\nAfter the refactor, 2,388 modules were transformed with zero errors. That number is meaningful: it means the import graph is clean, the types are consistent, and the module boundaries are respected. Running `npm run build` after every significant change catches integration issues that TypeScript alone misses.\n\n---\n\n## Future Plans\n\n- **Property detail public route** (`/property/:slug`) currently exists inside `/app/*`. Future work will evaluate moving it to the landing zone as a truly public, indexable page — with an \"I'm interested\" CTA that redirects guests to `/signup?redirectTo=/property/:slug`.\n- **Route-based code splitting** — The `index-CkLU8IG6.js` chunk is 1.4MB (384KB gzipped). `React.lazy()` is used for several components but further splitting of the main bundle is planned.\n- **OAuth callback explicit handling** — The current `OAuthCallback.tsx` is minimal. A future version will parse the OAuth state, extract the intended `redirectTo` destination, and route the user precisely after authentication.\n- **Sitemaps** — With the architectural separation between `/` (landing) and `/app/*` (authenticated), generating a sitemap covering only public URLs becomes straightforward.\n\n---\n\n## FAQ\n\n**Q: What is the main architectural change in Inhaby v1.8?**\nA: The primary change is moving `AuthProvider` and `AppStateProvider` from the root of the application (where they ran on every page including the landing page) to inside the authenticated sub-tree at `/app/*`. This ensures auth state only exists where it's needed and is automatically cleaned up on logout.\n\n**Q: Why did ProtectedRoute crash with \"useAuth must be used within an AuthProvider\"?**\nA: `ProtectedRoute` wraps `TenantApp`, and `AuthProvider` lives inside `TenantApp`. When `ProtectedRoute` called `useAuth()`, the context didn't exist — it was a child of the component, not a parent. The fix is to read Supabase's session directly in `ProtectedRoute` instead of using the React context.\n\n**Q: How does Inhaby guarantee no stale data after logout?**\nA: Two layers. First, the architecture: because `AuthProvider` unmounts with `TenantApp` on logout, all hook state is destroyed by React automatically. Second, explicit hook cleanup: every data hook clears its state when `user` becomes `null`, covering the brief race window between `signOut()` resolving and the unmount completing.\n\n**Q: Can this architecture work with React Router v6?**\nA: Yes. This entire implementation uses React Router v6 (`Routes`, `Route`, `Navigate`, `Outlet`, `useNavigate`). The nested route pattern — with layout components as route elements and `<Outlet />` for child routes — is a React Router v6 feature.\n\n**Q: What is GuestRoute?**\nA: `GuestRoute` is the inverse of `ProtectedRoute`. It guards the login, signup, and forgot-password pages — if a session already exists, it redirects to `/app`. This prevents authenticated users from accidentally landing on the login page.\n\n**Q: How does SEO work with this architecture?**\nA: Landing pages at `/` and its sub-paths are fully public and should be indexed normally. App pages at `/app/*` should be excluded from search indexing via `robots.txt` and `<meta name=\"robots\" content=\"noindex\">`. The URL structure makes this trivial to implement.\n\n---\n\n## Suggested Internal Links\n\n- [About Inhaby](/about)\n- [Founder Journal: Day 003 — I Rebuilt Everything](/blog/founder-journal/day-003-rebuilding-architecture)\n- [How @inhaby/shared Unifies Three React Apps](/blog/engineering/github-packages-inhaby-shared)\n\n## Suggested External References\n\n- [React Context documentation](https://react.dev/reference/react/createContext)\n- [React Router v6 — Outlet](https://reactrouter.com/en/main/components/outlet)\n- [Supabase Auth — onAuthStateChange](https://supabase.com/docs/reference/javascript/auth-onauthstatechange)\n- [Vite environment variables](https://vite.dev/guide/env-and-mode)\n\n---\n\n## Suggested Social Caption\n\n> \"We had a 1114-line router file, auth state leaking into the landing page, and stale user data surviving logout. This is the story of how we rebuilt it — and the two most important rules for React auth architecture. 🧵 #React #Vite #Authentication #OpenSource #proptech\"\n\n---\n\n## Related Articles\n\n- **Previous:** [How @inhaby/shared Unifies Three React Applications](/blog/engineering/github-packages-inhaby-shared)\n- **Next:** Upcoming — Property Detail Page Architecture\n- **Suggested Reading:** [Founder Journal Day 003](/blog/founder-journal/day-003-rebuilding-architecture)\n\n---\n\n## JSON-LD Recommendations\n\n```json\n{\n  \"@context\": \"https://schema.org\",\n  \"@type\": \"TechArticle\",\n  \"headline\": \"How Inhaby Merged a Landing Page Into a Vite React App Without Breaking Authentication\",\n  \"description\": \"Detailed engineering walkthrough of the Inhaby v1.8 refactor: separating a public landing website from an authenticated React app in one Vite project, fixing React provider ordering bugs, and guaranteeing clean logout state.\",\n  \"author\": {\n    \"@type\": \"Person\",\n    \"name\": \"Genofogu\",\n    \"url\": \"https://inhaby.com/founder/genofogu\",\n    \"jobTitle\": \"Co-Founder\"\n  },\n  \"publisher\": {\n    \"@type\": \"Organization\",\n    \"name\": \"Inhaby\",\n    \"url\": \"https://inhaby.com\"\n  },\n  \"datePublished\": \"2026-07-03\",\n  \"dateModified\": \"2026-07-03\",\n  \"mainEntityOfPage\": {\n    \"@type\": \"WebPage\",\n    \"@id\": \"https://inhaby.com/blog/engineering/landing-page-integration\"\n  },\n  \"keywords\": \"React, Vite, authentication, ProtectedRoute, landing page, routing, Supabase, provider ordering, logout\",\n  \"articleSection\": \"Engineering\"\n}\n```\n\n```json\n{\n  \"@context\": \"https://schema.org\",\n  \"@type\": \"FAQPage\",\n  \"mainEntity\": [\n    {\n      \"@type\": \"Question\",\n      \"name\": \"Why did ProtectedRoute crash with useAuth must be used within an AuthProvider?\",\n      \"acceptedAnswer\": {\n        \"@type\": \"Answer\",\n        \"text\": \"ProtectedRoute wraps TenantApp, and AuthProvider lives inside TenantApp. When ProtectedRoute called useAuth(), the context did not exist yet — it was a child of the component, not a parent. The fix is to read Supabase's session directly in ProtectedRoute instead of using the React context.\"\n      }\n    },\n    {\n      \"@type\": \"Question\",\n      \"name\": \"How does Inhaby guarantee no stale data after logout?\",\n      \"acceptedAnswer\": {\n        \"@type\": \"Answer\",\n        \"text\": \"Two layers. First, the architecture: because AuthProvider unmounts with TenantApp on logout, all hook state is destroyed by React automatically. Second, explicit hook cleanup: every data hook clears its state when user becomes null, covering the brief race window between signOut() resolving and the unmount completing.\"\n      }\n    },\n    {\n      \"@type\": \"Question\",\n      \"name\": \"What is the main architectural change in Inhaby v1.8?\",\n      \"acceptedAnswer\": {\n        \"@type\": \"Answer\",\n        \"text\": \"Moving AuthProvider and AppStateProvider from the application root to inside the authenticated sub-tree at /app/*. This ensures auth state only exists where needed and is automatically cleaned up on logout when React unmounts the entire TenantApp tree.\"\n      }\n    }\n  ]\n}\n```",
+  "seo": {
+    "seoTitle": "How to Merge a Landing Page Into a React Vite App Without Breaking Auth — Inhaby v1.8 Refactor",
+    "seoSlug": "landing-page-integration",
+    "metaTitle": "How to Merge a Landing Page Into a React Vite App Without Breaking Auth — Inhaby v1.8 Refactor",
+    "metaDescription": "Inhaby's engineering team walks through the v1.8 refactor: how to properly separate a public landing website from an authenticated React app inside one Vite project, fix React provider ordering bugs, and guarantee clean logout state.",
+    "openGraphTitle": "Merging a Landing Page Into a React App Without Breaking Auth: The Inhaby v1.8 Story",
+    "openGraphDesc": "One monolithic AppRouter. Five stale-state logout bugs. One 1114-line file. Here's how Inhaby rebuilt the architecture cleanly — and what every React developer should know about provider ordering.",
+    "canonicalUrl": "https://inhaby.com/blog/engineering/landing-page-integration",
+    "primaryCategory": "Engineering / Architecture",
+    "secondaryCategory": "Monorepo & Shared SDK",
+    "tags": [
+      "React",
+      "Vite",
+      "authentication",
+      "routing",
+      "architecture",
+      "Supabase",
+      "refactor",
+      "ProtectedRoute",
+      "context providers",
+      "logout"
+    ],
+    "readingTime": "14 minutes",
+    "publishedDate": "2026-07-03",
+    "updatedDate": "2026-07-03",
+    "targetAudience": "Software Engineers, Technical Architects, React Monorepo Developers",
+    "featuredImage": {
+      "url": "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&q=80&w=1200",
+      "suggestion": "A split-screen diagram showing two React component trees side by side — on the left, the \"Before\" tree with AuthProvider wrapping the entire app including the landing page; on the right, the \"After\" tree with AuthProvider scoped only to the /app/* sub-tree.",
+      "alt": "Before and after React component tree diagram showing AuthProvider moved from global scope to only wrapping the authenticated /app/* sub-tree in the Inhaby v1.8 refactor."
+    },
+    "lsiKeywords": [
+      {
+        "word": "React Vite landing page auth",
+        "count": 2,
+        "type": "Primary Keyword"
+      },
+      {
+        "word": "React provider ordering",
+        "count": 2,
+        "type": "Primary Keyword"
+      },
+      {
+        "word": "logout stale state React",
+        "count": 2,
+        "type": "Primary Keyword"
+      },
+      {
+        "word": "Vite multi-app architecture",
+        "count": 2,
+        "type": "Primary Keyword"
+      },
+      {
+        "word": "how to separate landing page from authenticated React app",
+        "count": 2,
+        "type": "Secondary Keyword"
+      },
+      {
+        "word": "React context provider ordering problem",
+        "count": 2,
+        "type": "Secondary Keyword"
+      },
+      {
+        "word": "fix stale state after logout React",
+        "count": 2,
+        "type": "Secondary Keyword"
+      },
+      {
+        "word": "Vite project two applications one build",
+        "count": 2,
+        "type": "Secondary Keyword"
+      },
+      {
+        "word": "ProtectedRoute AuthProvider ordering error",
+        "count": 2,
+        "type": "Secondary Keyword"
+      }
+    ],
+    "geoAeoFeatures": [
+      {
+        "type": "Direct Answer (AEO)",
+        "desc": "Provides a direct explanation matching the key entities for search engines query optimization."
+      }
+    ]
+  }
+},
 ];

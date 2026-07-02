@@ -240,7 +240,7 @@ export default function BlogListingPage() {
         
         {/* BREADCRUMB NAVIGATION */}
         <nav className="flex items-center space-x-2 text-xs font-bold uppercase tracking-widest text-muted-foreground mb-8">
-          <Link to="/" className="hover:text-primary transition-colors">INHABY</Link>
+          <Link to="/landing" className="hover:text-primary transition-colors">INHABY</Link>
           <ChevronRight className="w-3.5 h-3.5" />
           <span className="text-primary font-black">Trust Journal & Magazine</span>
         </nav>

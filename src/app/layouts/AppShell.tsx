@@ -45,7 +45,7 @@ export const AppShell: React.FC = () => {
     if (tab === 'LOGOUT') {
       await signOut();
       showToast('Logged out successfully', 'success');
-      navigate('/');
+      navigate('/landing');
       return;
     }
     if (tab === 'HOME') navigate('/app');

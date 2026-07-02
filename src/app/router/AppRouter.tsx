@@ -432,7 +432,7 @@ const ProfileRoute: React.FC = () => {
       onLogout={async () => {
         await signOut();
         showToast('Logged out successfully', 'success');
-        navigate('/');
+        navigate('/landing');
       }}
       onSelectedPropertyIdChange={(id) => {
         const prop = combinedPropertiesList.find(p => p.id === id);

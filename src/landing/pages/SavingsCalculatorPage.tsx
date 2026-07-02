@@ -93,7 +93,7 @@ export default function SavingsCalculatorPage() {
           className="mb-8"
         >
           <Link 
-            to="/" 
+            to="/landing" 
             className="inline-flex items-center text-muted-foreground hover:text-primary font-bold text-sm transition-colors group"
           >
             <ArrowLeft className="w-4 h-4 mr-2 transition-transform group-hover:-translate-x-1" />
