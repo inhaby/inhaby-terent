@@ -1,6 +1,7 @@
 import React from 'react';
 import { ChevronLeft } from 'lucide-react';
 import { MessagesSection } from '../../components/MessagesSection';
+import { useAppContext } from '../../app/AppContext';
 
 interface MessagesPageProps {
   openMsgPropertyId: string | null;
@@ -19,6 +20,8 @@ export const MessagesPage: React.FC<MessagesPageProps> = ({
   setIsMobileChatActive,
   setUnreadChatsCount
 }) => {
+  const { combinedPropertiesList } = useAppContext();
+
   return (
     <div className="bg-theme-bg min-h-screen text-left">
       <div className={`bg-gradient-to-br from-theme-accent to-theme-accent-hover px-6 pt-12 pb-8 text-white shadow-sm flex justify-between items-start ${isMobileChatActive ? 'hidden' : 'flex'}`}>
@@ -41,10 +44,10 @@ export const MessagesPage: React.FC<MessagesPageProps> = ({
       
       <div className="max-w-4xl mx-auto md:p-6">
         <MessagesSection 
-          openWithPropertyId={openMsgPropertyId}
-          onCloseWithProperty={() => setOpenMsgPropertyId(null)}
-          onMobileChatStateChange={setIsMobileChatActive}
-          onUnreadCountChange={setUnreadChatsCount}
+          propertiesList={combinedPropertiesList}
+          openConversationWithPropertyId={openMsgPropertyId}
+          onClearOpenConversation={() => setOpenMsgPropertyId(null)}
+          onChatActiveChange={setIsMobileChatActive}
         />
       </div>
     </div>

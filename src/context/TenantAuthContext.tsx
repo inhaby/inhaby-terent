@@ -23,7 +23,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
 
-  const fetchProfile = async (userId: string, email: string) => {
+  const fetchProfile = async (userId: string, email: string, currentUser?: any) => {
+    console.log("[TenantAuth] Fetching profile for userId:", userId, "email:", email);
     try {
       const { data, error } = await supabase
         .from('tenant_profiles')
@@ -32,29 +33,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .single();
 
       if (error) {
-        // If not found in tenant_profiles, check if this is an existing auth user
-        // that needs a tenant profile created (e.g. from Google login)
-        const currentUser = (await supabase.auth.getUser()).data.user;
-        if (currentUser && currentUser.id === userId) {
+        console.warn("[TenantAuth] Profile not found in tenant_profiles. Attempting to create one for userId:", userId);
+        const userObj = currentUser || (await supabase.auth.getUser()).data.user;
+        if (userObj && userObj.id === userId) {
+          console.log("[TenantAuth] Inserting record into tenant_users table for userId:", userId);
           const { error: userInsertErr } = await supabase
             .from('tenant_users')
             .insert({ id: userId, email: email })
             .select();
 
           if (!userInsertErr) {
+            console.log("[TenantAuth] Inserting record into tenant_profiles table for userId:", userId);
             const { data: newProfile, error: profileInsertErr } = await supabase
               .from('tenant_profiles')
               .insert({
                 id: userId,
-                name: currentUser.user_metadata?.name || 'New Tenant',
-                phone: currentUser.user_metadata?.phone || '',
-                avatar_url: currentUser.user_metadata?.avatar_url || '',
+                name: userObj.user_metadata?.name || 'New Tenant',
+                phone: userObj.user_metadata?.phone || '',
+                avatar_url: userObj.user_metadata?.avatar_url || '',
                 is_verified: false
               })
               .select()
               .single();
 
             if (!profileInsertErr && newProfile) {
+              console.log("[TenantAuth] Profile created successfully for userId:", userId);
               setProfile({
                 id: newProfile.id,
                 email: email,
@@ -67,14 +70,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               });
               setAuthError(null);
               return;
+            } else {
+              console.error("[TenantAuth] Failed to create tenant_profile record:", profileInsertErr);
             }
+          } else {
+            console.error("[TenantAuth] Failed to insert tenant_user record:", userInsertErr);
           }
+        } else {
+          console.error("[TenantAuth] User object mismatch or missing for userId:", userId);
         }
         
         console.error('Error fetching tenant profile:', error);
         setProfile(null);
         setAuthError('This account does not have access to the Tenant Application.');
       } else {
+        console.log("[TenantAuth] Profile loaded successfully for userId:", userId);
         setProfile({
           id: data.id,
           email: email,
@@ -88,7 +98,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setAuthError(null);
       }
     } catch (err) {
-      console.error('Error in fetchProfile:', err);
+      console.error('[TenantAuth] Unexpected error in fetchProfile:', err);
       setProfile(null);
       setAuthError('An unexpected error occurred while loading your profile.');
     }
@@ -102,35 +112,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    // Check active session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session) {
-        setUser(session.user);
-        const email = session.user.email ? session.user.email.replace('+tenant', '') : '';
-        await fetchProfile(session.user.id, email);
-      } else {
-        setUser(null);
-        setProfile(null);
-      }
-      setLoading(false);
-    });
+    console.log("[TenantAuth] Setting up onAuthStateChange listener");
+    setLoading(true);
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setLoading(true);
+      console.log(`[TenantAuth] onAuthStateChange event: ${event}, session:`, session ? `present (user: ${session.user?.email})` : 'null');
       if (session) {
+        // Only set loading=true when we have real async work to do (profile fetch)
+        setLoading(true);
         setUser(session.user);
         const email = session.user.email ? session.user.email.replace('+tenant', '') : '';
-        await fetchProfile(session.user.id, email);
+        await fetchProfile(session.user.id, email, session.user);
+        setLoading(false);
       } else {
+        // SIGNED_OUT — state already cleared by signOut(); no async work needed
         setUser(null);
         setProfile(null);
         setAuthError(null);
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => {
+      console.log("[TenantAuth] Cleaning up auth listener");
       subscription.unsubscribe();
     };
   }, []);
@@ -186,8 +190,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           access_type: 'offline',
           prompt: 'consent'
         },
-        redirectTo: window.location.origin
-      }
+        redirectTo: window.location.origin,
+        // RC-1 fix: pass app='tenant' into raw_user_meta_data so the
+        // handle_new_user DB trigger creates tenant_users + tenant_profiles
+        // on first Google OAuth signup (trigger checks: app_meta = 'tenant').
+        // `data` is supported at runtime but missing from this version's TS types.
+        data: { app: 'tenant' }
+      } as any
     });
     setLoading(false);
     return { error };
@@ -208,9 +217,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setProfile(null);
     setAuthError(null);
     
-    // Clear browser storage
+    // Only clear Supabase auth-related keys — avoid wiping all localStorage
+    // which would destroy app preferences and cached state
     try {
-      localStorage.clear();
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('sb-') || key.includes('supabase'))) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(k => localStorage.removeItem(k));
       sessionStorage.clear();
     } catch (e) {
       console.error("Browser storage clear error:", e);
@@ -219,6 +236,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(false);
     return { error: signOutErr };
   };
+
 
   const resetPassword = async (email: string) => {
     setLoading(true);

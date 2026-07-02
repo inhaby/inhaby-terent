@@ -46,7 +46,7 @@ const SERVED_AREAS = [
 
 interface SearchPageProps {
   onBack: () => void;
-  savedIds: Set<string>;
+  savedIds: any;
   onToggleSave: (id: string) => void;
   onSelectProperty: (id: string) => void;
   onShare: (p: Property) => void;

@@ -9,7 +9,7 @@ interface SearchPageProps {
   filteredProperties: Property[];
   onBack: () => void;
   onOpenFilters: () => void;
-  savedIds: Set<string>;
+  savedIds: any;
   toggleSave: (id: string) => void;
   setSelectedPropertyId: (id: string | null) => void;
   triggerShare: (p: Property) => void;

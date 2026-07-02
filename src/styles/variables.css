@@ -1,52 +1,103 @@
+/* Unification of Landing Page & Tenant App Design Tokens */
+
 :root {
-  /* Defaults: Light, Terracotta */
-  --bg: #FAF8F5;
+  /* Default Theme: Light, Accent: Terracotta */
+  --bg: #FCFAF7;
+  --background: #FCFAF7;
   --surface: #FFFFFF;
-  --text-primary: #2D2D2D;
-  --text-secondary: #6B7280;
-  --border: #E7E5E4;
+  --foreground: #1F242D;
+  --text-primary: #1F242D;
+  --text-secondary: #55738A;
+  --muted-foreground: #55738A;
+  --muted: #F5F1EB;
+  --border: #E6DFD5;
   
-  --accent: #B85C38;
-  --accent-hover: #A34E2C;
-  --accent-soft: #F7EBE5;
+  --primary: #C25D3D;
+  --primary-foreground: #FFFFFF;
+  --primary-soft: #FDF5F2;
+
+  --accent: #C25D3D;
+  --accent-hover: #A44A2F;
+  --accent-soft: #FDF5F2;
   --accent-contrast: #FFFFFF;
 }
 
-/* Light / Dark modes variables override */
-.theme-dark {
-  --bg: #18181B;
-  --surface: #27272A;
-  --text-primary: #FAFAFA;
-  --text-secondary: #A1A1AA;
-  --border: #3F3F46;
-}
+/* --- THEME TOGGLES: Support both class (.theme-dark) and data attribute ([data-theme="dark"]) --- */
 
-.theme-light {
-  --bg: #FAF8F5;
+.theme-light, [data-theme="light"] {
+  --bg: #FCFAF7;
+  --background: #FCFAF7;
   --surface: #FFFFFF;
-  --text-primary: #2D2D2D;
-  --text-secondary: #6B7280;
-  --border: #E7E5E4;
+  --foreground: #1F242D;
+  --text-primary: #1F242D;
+  --text-secondary: #55738A;
+  --muted-foreground: #55738A;
+  --muted: #F5F1EB;
+  --border: #E6DFD5;
 }
 
-/* Accent configurations styles (React app applies one of these onto high level element) */
-.accent-terracotta {
-  --accent: #B85C38;
-  --accent-hover: #A34E2C;
-  --accent-soft: rgba(184, 92, 56, 0.08);
+.theme-dark, [data-theme="dark"] {
+  --bg: #0D1117;
+  --background: #0D1117;
+  --surface: #161B22;
+  --foreground: #F0F3F6;
+  --text-primary: #F0F3F6;
+  --text-secondary: #8FA3B5;
+  --muted-foreground: #8FA3B5;
+  --muted: #161B22;
+  --border: #21262D;
 }
-.accent-olive {
-  --accent: #5C6B4F;
-  --accent-hover: #4D5A42;
-  --accent-soft: rgba(92, 107, 79, 0.08);
+
+/* --- ACCENT CONFIGURATIONS: Support both classes and data attributes --- */
+
+/* 1. Terracotta */
+.accent-terracotta, [data-accent="terracotta"] {
+  --primary: #C25D3D;
+  --primary-soft: #FDF5F2;
+  --accent: #C25D3D;
+  --accent-hover: #A44A2F;
+  --accent-soft: #FDF5F2;
 }
-.accent-sand {
-  --accent: #C2A878;
-  --accent-hover: #A88E61;
-  --accent-soft: rgba(194, 168, 120, 0.08);
+.theme-dark.accent-terracotta, [data-theme="dark"][data-accent="terracotta"] {
+  --primary-soft: #281B18;
+  --accent-soft: #281B18;
 }
-.accent-slate {
-  --accent: #607D8B;
-  --accent-hover: #526D79;
-  --accent-soft: rgba(96, 125, 139, 0.08);
+
+/* 2. Olive */
+.accent-olive, [data-accent="olive"] {
+  --primary: #556B4D;
+  --primary-soft: #F4F7F4;
+  --accent: #556B4D;
+  --accent-hover: #3F5A3A;
+  --accent-soft: #F4F7F4;
+}
+.theme-dark.accent-olive, [data-theme="dark"][data-accent="olive"] {
+  --primary-soft: #1D241C;
+  --accent-soft: #1D241C;
+}
+
+/* 3. Sand */
+.accent-sand, [data-accent="sand"] {
+  --primary: #C2A86A;
+  --primary-soft: #FAF7EF;
+  --accent: #C2A86A;
+  --accent-hover: #A18C4D;
+  --accent-soft: #FAF7EF;
+}
+.theme-dark.accent-sand, [data-theme="dark"][data-accent="sand"] {
+  --primary-soft: #2B2516;
+  --accent-soft: #2B2516;
+}
+
+/* 4. Slate */
+.accent-slate, [data-accent="slate"] {
+  --primary: #55738A;
+  --primary-soft: #F2F5F7;
+  --accent: #55738A;
+  --accent-hover: #395666;
+  --accent-soft: #F2F5F7;
+}
+.theme-dark.accent-slate, [data-theme="dark"][data-accent="slate"] {
+  --primary-soft: #172027;
+  --accent-soft: #172027;
 }

@@ -4,9 +4,11 @@
 @import "./animations.css";
 
 @theme {
+  /* Fonts */
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Cormorant Garamond", serif;
   
+  /* Tenant App Theme Colors */
   --color-theme-bg: var(--bg);
   --color-theme-surface: var(--surface);
   --color-theme-text-primary: var(--text-primary);
@@ -16,18 +18,80 @@
   --color-theme-accent-hover: var(--accent-hover);
   --color-theme-accent-soft: var(--accent-soft);
   --color-theme-accent-contrast: var(--accent-contrast);
+
+  /* Landing Page Theme Colors */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-soft: var(--primary-soft);
+
+  /* Specific design system palettes */
+  --color-terracotta: #C25D3D;
+  --color-terracotta-dark: #A44A2F;
+  --color-terracotta-soft: #E9B39C;
+  --color-terracotta-light: #FDF5F2;
+
+  --color-olive: #556B4D;
+  --color-olive-dark: #3F5A3A;
+  --color-olive-soft: #A6B89A;
+  --color-olive-light: #F4F7F4;
+
+  --color-sand: #C2A86A;
+  --color-sand-dark: #A18C4D;
+  --color-sand-soft: #E8D9B0;
+  --color-sand-light: #FAF7EF;
+
+  --color-slate-calm: #55738A;
+  --color-slate-dark: #395666;
+  --color-slate-soft: #A6B7C4;
 }
 
-/* Base body styles */
+/* Base styles */
 @layer base {
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 5rem;
+  }
+  html, body, #root {
+    @apply min-h-screen overflow-x-hidden w-full max-w-full;
+  }
   body {
     background-color: var(--bg);
     color: var(--text-primary);
     transition: background-color 0.4s ease, color 0.4s ease, border-color 0.4s ease;
+    @apply font-sans antialiased;
   }
 }
 
+/* Custom Utilities & Animations */
 @layer utilities {
+  .shimmer-bg {
+    background: linear-gradient(
+      90deg,
+      var(--muted) 25%,
+      var(--border) 50%,
+      var(--muted) 75
+    );
+    background-size: 200% 100%;
+  }
+
+  .animate-shimmer {
+    animation: shimmer-anim 1.8s infinite linear;
+  }
+
+  @keyframes shimmer-anim {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
@@ -35,11 +99,174 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
-  
+
   @media (min-width: 1024px) {
     .desktop-listings-grid {
       display: grid !important;
       grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)) !important;
     }
   }
+
+  /* Custom Hero Animations for Desktop & Tablets (>=768px) */
+  @media (min-width: 768px) {
+    /* Phone Entrance Animation */
+    .animate-phone-entrance {
+      animation: phoneEntrance 700ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      will-change: transform, opacity;
+    }
+
+    @keyframes phoneEntrance {
+      0% {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Phone Float Animation */
+    .animate-phone-float {
+      animation: phoneFloat 8s ease-in-out infinite;
+      will-change: transform;
+    }
+
+    @keyframes phoneFloat {
+      0% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+      100% { transform: translateY(0); }
+    }
+
+    /* Badge Cycle Animation */
+    .animate-badge-cycle {
+      animation: badgeCycle 2800ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+      will-change: transform, opacity;
+    }
+
+    @keyframes badgeCycle {
+      0% { opacity: 0; transform: translateY(8px); }
+      10.71% { opacity: 1; transform: translateY(0); }
+      89.29% { opacity: 1; transform: translateY(0); }
+      100% { opacity: 0; transform: translateY(-8px); }
+    }
+
+    /* Background Glow Animation */
+    .animate-glow-pulse {
+      animation: glowPulse 14s ease-in-out infinite;
+      will-change: transform, opacity;
+    }
+
+    @keyframes glowPulse {
+      0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.05; }
+      50% { transform: translate(-50%, -50%) scale(1.02); opacity: 0.08; }
+    }
+
+    /* Floating Trust Badges */
+    .animate-float-badge-1 { animation: floatBadge1 6.5s ease-in-out infinite; will-change: transform; }
+    .animate-float-badge-2 { animation: floatBadge2 7s ease-in-out infinite; will-change: transform; }
+    .animate-float-badge-3 { animation: floatBadge3 7.5s ease-in-out infinite; will-change: transform; }
+    .animate-float-badge-4 { animation: floatBadge4 8s ease-in-out infinite; will-change: transform; }
+    .animate-float-badge-5 { animation: floatBadge5 8.5s ease-in-out infinite; will-change: transform; }
+
+    @keyframes floatBadge1 { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+    @keyframes floatBadge2 { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(5px); } }
+    @keyframes floatBadge3 { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+    @keyframes floatBadge4 { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(6px); } }
+    @keyframes floatBadge5 { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+
+    .animate-cursor-blink { animation: cursorBlink 1s infinite step-end; will-change: opacity; }
+    @keyframes cursorBlink { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
+
+    .animate-slow-zoom { animation: slowZoom 8s ease-in-out infinite; will-change: transform; }
+    @keyframes slowZoom { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.02); } }
+
+    .animate-badge-pulse { animation: badgePulse 4s ease-in-out infinite; will-change: transform; }
+    @keyframes badgePulse { 0%, 70%, 100% { transform: scale(1); } 85% { transform: scale(1.15); } }
+
+    .animate-heart-fill { animation: heartFill 6s ease-in-out infinite; will-change: transform, opacity; }
+    @keyframes heartFill {
+      0%, 100% { fill: transparent; stroke: currentColor; opacity: 0.6; }
+      40%, 60% { fill: #ef4444; stroke: #ef4444; opacity: 1; transform: scale(1.1); }
+    }
+
+    .animate-notification-blink { animation: notificationBlink 5s ease-in-out infinite; will-change: transform, opacity; }
+    @keyframes notificationBlink { 0%, 80%, 100% { opacity: 1; transform: scale(1); } 90% { opacity: 0.3; transform: scale(0.85); } }
+
+    .animate-avatar-pulse { animation: avatarPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; will-change: transform, opacity; }
+    @keyframes avatarPulse { 0% { transform: scale(1); opacity: 0.75; } 100% { transform: scale(2.2); opacity: 0; } }
+
+    .animate-fade-in { animation: fadeIn 350ms cubic-bezier(0.16, 1, 0.3, 1) forwards; will-change: opacity; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .animate-scale-up { animation: scaleUp 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards; will-change: transform; }
+    @keyframes scaleUp { from { transform: scale(0.9) translateY(10px); } to { transform: scale(1) translateY(0); } }
+
+    .hero-phone-group { pointer-events: auto; }
+    .hero-phone-group .phone-hover-container {
+      transition: transform 250ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 250ms cubic-bezier(0.16, 1, 0.3, 1);
+      will-change: transform;
+    }
+    .hero-phone-group:hover .phone-hover-container {
+      transform: translateY(-6px);
+      box-shadow: 0 35px 75px -12px rgba(0, 0, 0, 0.4);
+    }
+    .hero-phone-group .badge-hover-container {
+      transition: transform 250ms cubic-bezier(0.16, 1, 0.3, 1);
+      will-change: transform;
+    }
+    .hero-phone-group:hover .badge-hover-container { transform: scale(1.02); }
+    .hero-phone-group .property-card-elevate {
+      transition: transform 250ms cubic-bezier(0.16, 1, 0.3, 1);
+      will-change: transform;
+    }
+    .hero-phone-group:hover .property-card-elevate { transform: translateY(-4px); }
+
+    .bg-themed-radial-glow {
+      background: radial-gradient(circle, var(--primary) 0%, transparent 70%);
+    }
+  }
+
+  /* Accessibility: Reduced Motion */
+  @media (prefers-reduced-motion: reduce) {
+    .animate-phone-entrance,
+    .animate-phone-float,
+    .animate-badge-cycle,
+    .animate-glow-pulse,
+    .animate-cursor-blink,
+    .animate-slow-zoom,
+    .animate-badge-pulse,
+    .animate-heart-fill,
+    .animate-notification-blink,
+    .animate-avatar-pulse,
+    .animate-float-badge-1,
+    .animate-float-badge-2,
+    .animate-float-badge-3,
+    .animate-float-badge-4,
+    .animate-float-badge-5 {
+      animation: none !important;
+      transform: none !important;
+      opacity: 1 !important;
+    }
+  }
+}
+
+/* Locale overrides */
+html[lang="ja"] {
+  font-family: "Inter", "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Segoe UI", "Meiryo", sans-serif;
+  --font-sans: "Inter", "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Segoe UI", "Meiryo", sans-serif;
+  line-height: 1.625;
+  letter-spacing: 0.02em;
+}
+html[lang="zh"] {
+  font-family: "Inter", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
+  --font-sans: "Inter", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
+  line-height: 1.625;
+  letter-spacing: 0.03em;
+}
+html[lang="ko"] {
+  font-family: "Inter", "Apple SD Gothic Neo", "Malgun Gothic", "Nanum Gothic", sans-serif;
+  --font-sans: "Inter", "Apple SD Gothic Neo", "Malgun Gothic", "Nanum Gothic", sans-serif;
+  line-height: 1.65;
+  letter-spacing: 0.01em;
 }

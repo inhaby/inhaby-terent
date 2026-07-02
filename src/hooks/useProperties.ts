@@ -34,7 +34,7 @@ export function useProperties(searchQuery: string, activeTab: string, activeLoca
   // Load Home/Explore Sections
   useEffect(() => {
     const area = activeLocation?.area || '';
-    const city = activeLocation?.city || 'Bengaluru';
+    const city = activeLocation?.city || '';
     propertyService.getHomeSections(activeCategory, area, city)
       .then(setSections)
       .catch(() => {});
@@ -45,7 +45,7 @@ export function useProperties(searchQuery: string, activeTab: string, activeLoca
     if (viewAllSection || activeTab === 'VISITS') return;
     setIsLoading(true);
     const area = activeLocation?.area || '';
-    const city = activeLocation?.city || 'Bengaluru';
+    const city = activeLocation?.city || '';
     
     const params = {
       page: page.toString(),

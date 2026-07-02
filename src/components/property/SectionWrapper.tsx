@@ -1,3 +1,4 @@
+import React from 'react';
 import { LazyImage } from '../LazyImage';
 import { Section, Property } from '../../types';
 import { 
@@ -21,14 +22,14 @@ interface SectionWrapperProps {
   onViewAll: (s: Section) => void;
 }
 
-export const SectionWrapper = ({ 
+export const SectionWrapper: React.FC<SectionWrapperProps> = ({ 
   section, 
   savedIds, 
   onToggleSave, 
   onClick, 
   onShare, 
   onViewAll 
-}: SectionWrapperProps) => {
+}) => {
   if (section.items && section.items.length === 0) {
     return null;
   }

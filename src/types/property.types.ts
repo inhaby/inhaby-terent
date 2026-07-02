@@ -1,5 +1,6 @@
 export interface Property {
   id: string;
+  slug?: string;
   title: string;
   image: string;
   images: string[];
