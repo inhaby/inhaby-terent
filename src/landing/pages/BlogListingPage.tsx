@@ -1,10 +1,10 @@
 import { useState, useMemo, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
-import { 
-  Search, BookOpen, Clock, Calendar, ArrowRight, Mail, Share2, 
-  Check, ChevronRight, Sparkles, Star, Flame, User, 
-  Tag, Compass, Shield, Bookmark, X, FileText, Send, 
+import {
+  Search, BookOpen, Clock, Calendar, ArrowRight, Mail, Share2,
+  Check, ChevronRight, Sparkles, Star, Flame, User,
+  Tag, Compass, Shield, Bookmark, X, FileText, Send,
   HelpCircle, Eye, AlertCircle, BookOpenCheck, ListChecks, Info
 } from "lucide-react";
 import OptimizedImage from "../components/OptimizedImage";
@@ -146,7 +146,7 @@ export default function BlogListingPage() {
   const [bookmarkedIds, setBookmarkedIds] = useState<string[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   // Newsletter state
   const [newsletterEmail, setNewsletterEmail] = useState("");
   const [newsletterSuccess, setNewsletterSuccess] = useState(false);
@@ -161,17 +161,17 @@ export default function BlogListingPage() {
   // Filter logic for BLOG_ARTICLES
   const filteredArticles = useMemo(() => {
     return BLOG_ARTICLES.filter((article) => {
-      const matchesSearch = 
+      const matchesSearch =
         article.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         article.seo.metaDescription.toLowerCase().includes(searchQuery.toLowerCase()) ||
         article.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()));
 
-      const matchesCategory = 
-        selectedCategory === "All Articles" || 
+      const matchesCategory =
+        selectedCategory === "All Articles" ||
         article.category === selectedCategory;
 
-      const matchesTag = 
-        !selectedTag || 
+      const matchesTag =
+        !selectedTag ||
         article.tags.includes(selectedTag);
 
       return matchesSearch && matchesCategory && matchesTag;
@@ -197,12 +197,12 @@ export default function BlogListingPage() {
   const toggleBookmark = (id: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setBookmarkedIds((prev) => 
+    setBookmarkedIds((prev) =>
       prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
     );
   };
 
-  // Handle link sharing copy
+  // Handle link-sharing-copy action
   const handleCopyLink = (slug: string, id: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -230,14 +230,14 @@ export default function BlogListingPage() {
 
   return (
     <div className="bg-background min-h-screen text-foreground relative pt-20">
-      
+
       {/* Editorial Decorative Background Details */}
       <div className="absolute top-[8%] right-[5%] w-[450px] h-[450px] bg-primary/4 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute top-[50%] left-[-10%] w-[550px] h-[550px] bg-primary/3 rounded-full blur-[140px] pointer-events-none" />
 
       {/* Main Container */}
       <div className="container px-6 mx-auto pb-24 relative z-10">
-        
+
         {/* BREADCRUMB NAVIGATION */}
         <nav className="flex items-center space-x-2 text-xs font-bold uppercase tracking-widest text-muted-foreground mb-8">
           <Link to="/landing" className="hover:text-primary transition-colors">INHABY</Link>
@@ -255,7 +255,7 @@ export default function BlogListingPage() {
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-black font-sans tracking-tight leading-[1.08] text-foreground">
             The INHABY Journal
           </h1>
-          
+
           <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto font-medium leading-relaxed">
             We educate, we don't market. Unveiling direct-owner rental blueprints, rigorous legal deed guidelines, and landlord vetting procedures built to protect your rent.
           </p>
@@ -267,22 +267,20 @@ export default function BlogListingPage() {
                 setActiveTab("articles");
                 clearFilters();
               }}
-              className={`w-1/2 flex items-center justify-center space-x-2 py-3 text-xs font-black rounded-xl transition-all cursor-pointer ${
-                activeTab === "articles" 
-                  ? "bg-background text-primary shadow-sm" 
+              className={`w-1/2 flex items-center justify-center space-x-2 py-3 text-xs font-black rounded-xl transition-all cursor-pointer ${activeTab === "articles"
+                  ? "bg-background text-primary shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
-              }`}
+                }`}
             >
               <BookOpen className="w-4 h-4" />
               <span>Trust Articles</span>
             </button>
             <button
               onClick={() => setActiveTab("roadmap")}
-              className={`w-1/2 flex items-center justify-center space-x-2 py-3 text-xs font-black rounded-xl transition-all cursor-pointer ${
-                activeTab === "roadmap" 
-                  ? "bg-background text-primary shadow-sm" 
+              className={`w-1/2 flex items-center justify-center space-x-2 py-3 text-xs font-black rounded-xl transition-all cursor-pointer ${activeTab === "roadmap"
+                  ? "bg-background text-primary shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
-              }`}
+                }`}
             >
               <Compass className="w-4 h-4" />
               <span>Editorial Roadmap</span>
@@ -307,7 +305,7 @@ export default function BlogListingPage() {
                   className="w-full pl-12 pr-12 py-4 bg-background border border-border rounded-full text-sm font-semibold placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-md"
                 />
                 {searchQuery && (
-                  <button 
+                  <button
                     onClick={() => setSearchQuery("")}
                     className="absolute right-4 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full animate-none"
                   >
@@ -324,7 +322,7 @@ export default function BlogListingPage() {
                   <Compass className="w-4 h-4 text-primary" />
                   <span>Browse Categories:</span>
                 </div>
-                
+
                 <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 -mb-1 max-w-full">
                   {CATEGORIES.map((cat) => {
                     const isSelected = selectedCategory === cat;
@@ -335,11 +333,10 @@ export default function BlogListingPage() {
                           setSelectedCategory(cat);
                           setSelectedTag(null); // Clear active tag to avoid conflicts
                         }}
-                        className={`px-4.5 py-2.5 text-xs font-bold rounded-full border transition-all whitespace-nowrap cursor-pointer ${
-                          isSelected 
-                            ? "bg-primary text-primary-foreground border-primary shadow-sm scale-102" 
+                        className={`px-4.5 py-2.5 text-xs font-bold rounded-full border transition-all whitespace-nowrap cursor-pointer ${isSelected
+                            ? "bg-primary text-primary-foreground border-primary shadow-sm scale-102"
                             : "bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground border-border/80"
-                        }`}
+                          }`}
                       >
                         {cat}
                       </button>
@@ -351,10 +348,10 @@ export default function BlogListingPage() {
 
             {/* TWO COLUMNS: STORIES GRID & SIDEBAR */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
-              
+
               {/* LEFT SECTION (8 COLS): EDITORIAL STORIES AND GRIDS */}
               <main className="lg:col-span-8 space-y-16">
-                
+
                 {isLoading ? (
                   <div className="space-y-16">
                     {/* Cover Story Skeleton */}
@@ -398,15 +395,15 @@ export default function BlogListingPage() {
                           <span>Featured Cover Story</span>
                         </div>
 
-                        <Link 
+                        <Link
                           to={`/blog/${primaryFeatured.slug}`}
                           className="block bg-background border border-border rounded-[2.5rem] overflow-hidden transition-all duration-500 hover:shadow-2xl hover:border-primary/20 group relative"
                         >
                           <div className="grid grid-cols-1 md:grid-cols-12">
                             {/* Image side */}
                             <div className="md:col-span-6 aspect-[16/10] md:aspect-auto overflow-hidden relative">
-                              <OptimizedImage 
-                                src={primaryFeatured.image} 
+                              <OptimizedImage
+                                src={primaryFeatured.image}
                                 alt={primaryFeatured.title}
                                 aspectRatio="aspect-full h-full w-full"
                                 loading="eager"
@@ -442,14 +439,14 @@ export default function BlogListingPage() {
                                 </div>
 
                                 <div className="flex items-center space-x-2">
-                                  <button 
+                                  <button
                                     onClick={(e) => toggleBookmark(primaryFeatured.id, e)}
                                     className="w-8 h-8 rounded-xl bg-muted hover:bg-primary-soft text-foreground hover:text-primary flex items-center justify-center transition-colors border border-transparent hover:border-primary/10 cursor-pointer"
                                     title="Bookmark Article"
                                   >
                                     <Bookmark className={`w-3.5 h-3.5 ${bookmarkedIds.includes(primaryFeatured.id) ? "fill-primary text-primary" : ""}`} />
                                   </button>
-                                  <button 
+                                  <button
                                     onClick={(e) => handleCopyLink(primaryFeatured.slug, primaryFeatured.id, e)}
                                     className="w-8 h-8 rounded-xl bg-muted hover:bg-primary-soft text-foreground hover:text-primary flex items-center justify-center transition-colors border border-transparent hover:border-primary/10 cursor-pointer"
                                     title="Copy Link"
@@ -488,7 +485,7 @@ export default function BlogListingPage() {
                           <p className="text-xs text-muted-foreground max-w-sm mx-auto font-semibold">
                             We haven't covered that topic yet, but it may be planned! Check out our transparent Editorial Roadmap below to see upcoming topics.
                           </p>
-                          <button 
+                          <button
                             onClick={clearFilters}
                             className="px-5 py-2.5 bg-primary text-primary-foreground font-black rounded-xl text-xs shadow-md hover:opacity-95 cursor-pointer"
                           >
@@ -498,16 +495,16 @@ export default function BlogListingPage() {
                       ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                           {filteredArticles.map((article) => (
-                            <Link 
+                            <Link
                               key={article.id}
                               to={`/blog/${article.slug}`}
                               className="group flex flex-col bg-background border border-border hover:border-primary/20 rounded-[2rem] overflow-hidden transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl"
                             >
                               {/* Aspect ratio bounding box for catalog layout */}
                               <div className="aspect-[16/10] overflow-hidden relative">
-                                <OptimizedImage 
-                                  src={article.image} 
-                                  alt={article.title} 
+                                <OptimizedImage
+                                  src={article.image}
+                                  alt={article.title}
                                   aspectRatio="aspect-full h-full w-full"
                                   loading="lazy"
                                 />
@@ -545,13 +542,13 @@ export default function BlogListingPage() {
                                   </div>
 
                                   <div className="flex items-center space-x-1.5" onClick={(e) => e.stopPropagation()}>
-                                    <button 
+                                    <button
                                       onClick={(e) => toggleBookmark(article.id, e)}
                                       className="w-7 h-7 rounded-lg bg-muted/60 hover:bg-primary-soft text-foreground hover:text-primary flex items-center justify-center transition-colors cursor-pointer"
                                     >
                                       <Bookmark className={`w-3 h-3 ${bookmarkedIds.includes(article.id) ? "fill-primary text-primary" : ""}`} />
                                     </button>
-                                    <button 
+                                    <button
                                       onClick={(e) => handleCopyLink(article.slug, article.id, e)}
                                       className="w-7 h-7 rounded-lg bg-muted/60 hover:bg-primary-soft text-foreground hover:text-primary flex items-center justify-center transition-colors cursor-pointer"
                                     >
@@ -572,7 +569,7 @@ export default function BlogListingPage() {
 
               {/* RIGHT SIDEBAR (4 COLS): POPULAR READS + NEWSLETTER + TAG CLOUD */}
               <aside className="lg:col-span-4 space-y-8 lg:sticky lg:top-28" id="desktop-sidebar">
-                
+
                 {/* Popular Tags cloud */}
                 <div className="bg-background border border-border rounded-[2.5rem] p-8 shadow-xs space-y-6">
                   <h3 className="text-xs font-black text-foreground uppercase tracking-wider pb-3 border-b border-border/60 flex items-center space-x-2">
@@ -589,11 +586,10 @@ export default function BlogListingPage() {
                             setSelectedTag(isActive ? null : tag);
                             setSelectedCategory("All Articles"); // Reset category to avoid filter collision
                           }}
-                          className={`px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all cursor-pointer ${
-                            isActive 
-                              ? "bg-primary text-primary-foreground border-primary scale-102" 
+                          className={`px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all cursor-pointer ${isActive
+                              ? "bg-primary text-primary-foreground border-primary scale-102"
                               : "bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground border border-border/40"
-                          }`}
+                            }`}
                         >
                           #{tag}
                         </button>
@@ -616,9 +612,9 @@ export default function BlogListingPage() {
                         className="flex items-start space-x-3.5 group animate-none"
                       >
                         <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-muted border border-border">
-                          <OptimizedImage 
-                            src={article.image} 
-                            alt={article.title} 
+                          <OptimizedImage
+                            src={article.image}
+                            alt={article.title}
                             aspectRatio="aspect-square w-full h-full"
                             loading="lazy"
                           />
@@ -647,15 +643,15 @@ export default function BlogListingPage() {
                     Unlock direct landlord negotiation checklists, rental escrow tips, and legal rent agreement guides delivered safely to your inbox.
                   </p>
                   <form onSubmit={handleSubscribe} className="space-y-2 pt-1">
-                    <input 
-                      type="email" 
-                      placeholder="Enter email address" 
+                    <input
+                      type="email"
+                      placeholder="Enter email address"
                       value={newsletterEmail}
                       onChange={(e) => setNewsletterEmail(e.target.value)}
                       required
                       className="w-full px-4 py-3 bg-background border border-border rounded-xl text-xs text-foreground font-semibold focus:outline-none focus:border-primary/50 transition-colors"
                     />
-                    <button 
+                    <button
                       type="submit"
                       className="w-full py-3 bg-primary hover:opacity-95 text-primary-foreground font-black text-xs rounded-xl flex items-center justify-center space-x-1.5 shadow-sm transition-opacity cursor-pointer"
                     >
@@ -664,7 +660,7 @@ export default function BlogListingPage() {
                     </button>
                   </form>
                   {newsletterSuccess && (
-                    <motion.div 
+                    <motion.div
                       initial={{ opacity: 0, y: 5 }}
                       animate={{ opacity: 1, y: 0 }}
                       className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-[11px] text-emerald-600 dark:text-emerald-500 font-bold leading-normal"
@@ -679,16 +675,16 @@ export default function BlogListingPage() {
             </div>
           </div>
         ) : (
-          
+
           /* ========================================================= */
           /* TAB 2: INHABY EDITORIAL ROADMAP & TRANSPARENCY MANUAL */
           /* ========================================================= */
           <div className="space-y-16" id="editorial-roadmap-tab">
-            
+
             {/* Philosophical Pillars Card */}
             <div className="bg-background border border-border rounded-[3rem] p-8 md:p-12 relative overflow-hidden shadow-xs">
               <div className="absolute top-0 right-0 w-48 h-48 bg-primary/3 rounded-full blur-2xl pointer-events-none" />
-              
+
               <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
                 <div className="md:col-span-7 space-y-4">
                   <div className="flex items-center space-x-2 text-primary font-black text-xs uppercase tracking-wider">
@@ -702,7 +698,7 @@ export default function BlogListingPage() {
                     Instead of trying to aggressively sell our product, we focus on extreme education. Renting is broken in India, filled with asymmetric information and middleman monopolies. By telling the absolute truth and providing legal and technical tools to renters, we establish trust naturally. Trust is our ultimate growth engine.
                   </p>
                 </div>
-                
+
                 <div className="md:col-span-5 bg-muted/50 border border-border p-6 rounded-2xl grid grid-cols-2 gap-4 text-center">
                   <div className="p-4 bg-background border border-border/60 rounded-xl">
                     <span className="text-[10px] text-primary font-black uppercase tracking-widest block mb-1">Pillar 01</span>
@@ -734,9 +730,9 @@ export default function BlogListingPage() {
                 <Calendar className="w-5 h-5 text-primary" />
                 <span>Monthly Publishing Cadence Plan</span>
               </div>
-              
+
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                
+
                 <div className="p-6 bg-muted/40 border border-border rounded-2xl flex flex-col justify-between space-y-4">
                   <div className="space-y-1.5">
                     <span className="text-[10px] text-primary font-black uppercase tracking-widest">Type A</span>
@@ -806,7 +802,7 @@ export default function BlogListingPage() {
 
               <div className="space-y-6">
                 {ROADMAP_PHASES.map((phaseData) => (
-                  <div 
+                  <div
                     key={phaseData.phase}
                     className="bg-background border border-border hover:border-primary/10 rounded-3xl p-6 md:p-8 transition-all space-y-6 group"
                   >
@@ -828,20 +824,19 @@ export default function BlogListingPage() {
                     {/* Topics Sub-grid */}
                     <div className="border-t border-border/50 pt-5">
                       <span className="text-[10px] text-primary font-black uppercase tracking-widest block mb-3">Roadmap Articles & Topics</span>
-                      
+
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {phaseData.topics.map((topic, index) => {
                           const isPublished = !!topic.slug;
                           const publishedArticle = isPublished ? BLOG_ARTICLES.find(a => a.slug === topic.slug) : null;
-                          
+
                           return (
-                            <div 
-                              key={index} 
-                              className={`p-4 rounded-xl flex items-center justify-between gap-4 border transition-all ${
-                                isPublished 
-                                  ? "bg-primary-soft/20 hover:bg-primary-soft/30 border-primary/15" 
+                            <div
+                              key={index}
+                              className={`p-4 rounded-xl flex items-center justify-between gap-4 border transition-all ${isPublished
+                                  ? "bg-primary-soft/20 hover:bg-primary-soft/30 border-primary/15"
                                   : "bg-muted/10 border-dashed border-border/60 text-muted-foreground"
-                              }`}
+                                }`}
                             >
                               <div className="space-y-1">
                                 <span className="text-[10px] font-semibold text-foreground/85 leading-snug block line-clamp-1">
@@ -854,9 +849,9 @@ export default function BlogListingPage() {
                                   </span>
                                 )}
                               </div>
-                              
+
                               {isPublished && topic.slug ? (
-                                <Link 
+                                <Link
                                   to={`/blog/${topic.slug}`}
                                   className="px-3 py-1.5 bg-primary text-primary-foreground font-black text-[9px] uppercase tracking-wider rounded-lg flex items-center space-x-1 hover:opacity-95 shrink-0"
                                 >
@@ -895,15 +890,15 @@ export default function BlogListingPage() {
           </div>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 relative z-10">
-            <Link 
-              to="/savings" 
+            <Link
+              to="/savings"
               className="w-full sm:w-auto px-8 py-4 bg-primary text-primary-foreground font-black rounded-full text-xs hover:opacity-95 transition-all shadow-lg flex items-center justify-center space-x-2"
             >
               <span>Calculate Savings</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
-            <Link 
-              to="/verify" 
+            <Link
+              to="/verify"
               className="w-full sm:w-auto px-8 py-4 bg-background border border-border hover:bg-muted text-foreground font-black rounded-full text-xs transition-all flex items-center justify-center space-x-2"
             >
               <Shield className="w-4 h-4 text-primary" />
