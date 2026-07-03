@@ -193,7 +193,7 @@ export default function BlogListingPage() {
     return BLOG_ARTICLES.filter((_, idx) => idx % 2 === 0).slice(0, 4);
   }, []);
 
-  // Handle bookmarking toggle
+  // Handle bookmarking-toggle
   const toggleBookmark = (id: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -268,8 +268,8 @@ export default function BlogListingPage() {
                 clearFilters();
               }}
               className={`w-1/2 flex items-center justify-center space-x-2 py-3 text-xs font-black rounded-xl transition-all cursor-pointer ${activeTab === "articles"
-                  ? "bg-background text-primary shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
+                ? "bg-background text-primary shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
                 }`}
             >
               <BookOpen className="w-4 h-4" />
@@ -278,8 +278,8 @@ export default function BlogListingPage() {
             <button
               onClick={() => setActiveTab("roadmap")}
               className={`w-1/2 flex items-center justify-center space-x-2 py-3 text-xs font-black rounded-xl transition-all cursor-pointer ${activeTab === "roadmap"
-                  ? "bg-background text-primary shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
+                ? "bg-background text-primary shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
                 }`}
             >
               <Compass className="w-4 h-4" />
@@ -334,8 +334,8 @@ export default function BlogListingPage() {
                           setSelectedTag(null); // Clear active tag to avoid conflicts
                         }}
                         className={`px-4.5 py-2.5 text-xs font-bold rounded-full border transition-all whitespace-nowrap cursor-pointer ${isSelected
-                            ? "bg-primary text-primary-foreground border-primary shadow-sm scale-102"
-                            : "bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground border-border/80"
+                          ? "bg-primary text-primary-foreground border-primary shadow-sm scale-102"
+                          : "bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground border-border/80"
                           }`}
                       >
                         {cat}
@@ -587,8 +587,8 @@ export default function BlogListingPage() {
                             setSelectedCategory("All Articles"); // Reset category to avoid filter collision
                           }}
                           className={`px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all cursor-pointer ${isActive
-                              ? "bg-primary text-primary-foreground border-primary scale-102"
-                              : "bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground border border-border/40"
+                            ? "bg-primary text-primary-foreground border-primary scale-102"
+                            : "bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground border border-border/40"
                             }`}
                         >
                           #{tag}
@@ -834,8 +834,8 @@ export default function BlogListingPage() {
                             <div
                               key={index}
                               className={`p-4 rounded-xl flex items-center justify-between gap-4 border transition-all ${isPublished
-                                  ? "bg-primary-soft/20 hover:bg-primary-soft/30 border-primary/15"
-                                  : "bg-muted/10 border-dashed border-border/60 text-muted-foreground"
+                                ? "bg-primary-soft/20 hover:bg-primary-soft/30 border-primary/15"
+                                : "bg-muted/10 border-dashed border-border/60 text-muted-foreground"
                                 }`}
                             >
                               <div className="space-y-1">
