@@ -3,11 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, Sparkles, AlertCircle, ArrowLeft } from 'lucide-react';
 import { motion } from 'motion/react';
 import { supabase, validatePassword, handleAuthError } from '@inhaby/shared';
-import { useAppContext } from '../app/AppContext';
-
 export const ResetPasswordPage: React.FC = () => {
   const navigate = useNavigate();
-  const { showToast } = useAppContext();
+  const showToast = (msg: string, type?: string) => {
+    console.log(`[Toast] [${type || 'info'}]: ${msg}`);
+  };
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);

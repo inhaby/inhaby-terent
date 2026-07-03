@@ -24,7 +24,7 @@ import { ForgotPasswordPage } from '../auth/ForgotPassword';
 import { ResetPasswordPage } from '../auth/ResetPasswordPage';
 import { OAuthCallback } from '../auth/OAuthCallback';
 
-// Authenticated Tenant App
+import { AuthProvider } from '../context/TenantAuthContext';
 import { TenantApp } from '../app/App';
 
 import AboutPage from '../landing/pages/AboutPage';
@@ -86,7 +86,7 @@ export const RootRouter: React.FC = () => {
         </Route>
 
         {/* B. Guest Auth pages */}
-        <Route element={<GuestRoute><Outlet /></GuestRoute>}>
+        <Route element={<AuthProvider><GuestRoute><Outlet /></GuestRoute></AuthProvider>}>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />

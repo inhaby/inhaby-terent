@@ -4,11 +4,11 @@ import { useAuth } from '../context/TenantAuthContext';
 import { Mail, Lock, User, Phone, Sparkles, AlertCircle, ArrowRight, X } from 'lucide-react';
 import { motion } from 'motion/react';
 import { validateEmail, validatePassword, handleAuthError } from '@inhaby/shared';
-import { useAppContext } from '../app/AppContext';
-
 export const SignupPage: React.FC = () => {
   const navigate = useNavigate();
-  const { showToast } = useAppContext();
+  const showToast = (msg: string, type?: string) => {
+    console.log(`[Toast] [${type || 'info'}]: ${msg}`);
+  };
   const { signUp, signInWithGoogle, setAuthError } = useAuth();
   
   const [name, setName] = useState('');

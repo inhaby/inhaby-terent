@@ -4,11 +4,11 @@ import { useAuth } from '../context/TenantAuthContext';
 import { Mail, Sparkles, AlertCircle, ArrowLeft } from 'lucide-react';
 import { motion } from 'motion/react';
 import { validateEmail, handleAuthError } from '@inhaby/shared';
-import { useAppContext } from '../app/AppContext';
-
 export const ForgotPasswordPage: React.FC = () => {
   const navigate = useNavigate();
-  const { showToast } = useAppContext();
+  const showToast = (msg: string, type?: string) => {
+    console.log(`[Toast] [${type || 'info'}]: ${msg}`);
+  };
   const { resetPassword, setAuthError } = useAuth();
   
   const [email, setEmail] = useState('');
