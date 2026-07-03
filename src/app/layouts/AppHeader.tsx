@@ -75,10 +75,6 @@ export const AppHeader: React.FC = () => {
           setIsDark={setIsDark}
           accent={accent as any}
           setAccent={setAccent}
-          onOpenLocationSelector={() => setIsLocationSelectorOpen(true)}
-          selectedLocationName={activeLocation.area || activeLocation.name}
-          onOpenNotifications={() => navigate('/app/notifications')}
-          unreadNotificationsCount={unreadNotificationsCount}
         />
       </div>
 
