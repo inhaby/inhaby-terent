@@ -41,6 +41,7 @@ export interface Property {
   ownerId?: string;
   createdAt?: string;
   updatedAt?: string;
+  mediaItems?: any[];
 }
 
 export interface Category {

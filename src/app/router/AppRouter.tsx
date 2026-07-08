@@ -449,7 +449,7 @@ const ProfileRoute: React.FC = () => {
 
 // 7. Property detail page with slug-based lookups
 const PropertyDetailRoute: React.FC = () => {
-  const { slug } = useParams<{ slug: string }>();
+  const { slug, index } = useParams<{ slug: string; index?: string }>();
   const navigate = useNavigate();
   const {
     savedIds,
@@ -503,6 +503,7 @@ const PropertyDetailRoute: React.FC = () => {
   return (
     <PropertyDetailsPage 
       property={property}
+      initialGalleryIndex={index ? parseInt(index, 10) - 1 : undefined}
       onBack={() => {
         if (window.history.length > 1) window.history.back();
         else navigate('/app');
@@ -623,6 +624,7 @@ export const AppRouter: React.FC = () => {
         <Route path="notifications" element={<NotificationsRoute />} />
         <Route path="search" element={<StaysSearchRoute />} />
         <Route path="property/:slug" element={<PropertyDetailRoute />} />
+        <Route path="property/:slug/gallery/:index" element={<PropertyDetailRoute />} />
       </Route>
       {/* Catch-all redirect back to /app dashboard */}
       <Route path="*" element={<Navigate to="/app" replace />} />

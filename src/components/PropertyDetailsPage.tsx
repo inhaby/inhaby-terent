@@ -31,6 +31,9 @@ import {
 import { motion } from 'motion/react';
 import { Property, VisitRequest } from '../types';
 import { LazyImage } from './LazyImage';
+import { FullscreenGallery } from './property/FullscreenGallery';
+import PropertyVerificationCard from './property/PropertyVerificationCard';
+import PublicVerificationTimeline from './property/PublicVerificationTimeline';
 
 const AMENITY_ICONS: Record<string, any> = {
   Waves, Dumbbell, ShieldCheck, Zap, Wifi, Car, Coffee, Utensils, Tv, Wind
@@ -53,6 +56,7 @@ interface PropertyDetailsPageProps {
   onChatOwner: (propertyId: string) => void;
   visitStatus?: 'pending' | 'approved' | 'completed' | 'rejected' | 'none';
   visitRequest?: VisitRequest;
+  initialGalleryIndex?: number;
 }
 
 export const PropertyDetailsPage: React.FC<PropertyDetailsPageProps> = ({
@@ -64,14 +68,41 @@ export const PropertyDetailsPage: React.FC<PropertyDetailsPageProps> = ({
   onBookAttempt,
   onChatOwner,
   visitStatus = 'none',
-  visitRequest
+  visitRequest,
+  initialGalleryIndex
 }) => {
   const [activeImageIndex, setActiveImageIndex] = React.useState(0);
+  const [galleryIndex, setGalleryIndex] = React.useState<number | null>(
+    initialGalleryIndex !== undefined ? initialGalleryIndex : null
+  );
 
   React.useEffect(() => {
     // Scroll to the top when navigating to a new property page
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [property?.id]);
+
+  React.useEffect(() => {
+    if (initialGalleryIndex !== undefined) {
+      setGalleryIndex(initialGalleryIndex);
+    }
+  }, [initialGalleryIndex]);
+
+  // Setup normalized media list with metadata
+  const fullMediaItems = React.useMemo(() => {
+    if (!property) return [];
+    if (property.mediaItems && property.mediaItems.length > 0) {
+      return property.mediaItems;
+    }
+    const urls = property.images && property.images.length > 0 ? property.images : [property.image];
+    return urls.map((url, idx) => ({
+      id: `media-${idx}`,
+      url,
+      category: idx === 0 ? 'Exterior' : idx === 1 ? 'Living Room' : idx === 2 ? 'Bedroom' : 'Other',
+      version: 1,
+      edited: false,
+      is_cover: idx === 0
+    }));
+  }, [property]);
 
   if (!property) {
     return (
@@ -141,7 +172,10 @@ export const PropertyDetailsPage: React.FC<PropertyDetailsPageProps> = ({
         {/* 2. AIRBNB BENTO GALLERY GRID WITHOUT MODAL CONTAINER SCROLLS */}
         
         {/* Mobile Gallery (Carousel) */}
-        <div className="block md:hidden relative aspect-[4/3] rounded-2xl overflow-hidden bg-black select-none pointer-events-auto">
+        <div 
+          onClick={() => setGalleryIndex(activeImageIndex)}
+          className="block md:hidden relative aspect-[4/3] rounded-2xl overflow-hidden bg-black select-none pointer-events-auto cursor-pointer"
+        >
           <LazyImage 
             src={property.images?.[activeImageIndex] || property.image} 
             alt={property.title} 
@@ -156,7 +190,10 @@ export const PropertyDetailsPage: React.FC<PropertyDetailsPageProps> = ({
               {property.images.map((_, i) => (
                 <button 
                   key={i}
-                  onClick={() => setActiveImageIndex(i)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveImageIndex(i);
+                  }}
                   className={`h-1.5 transition-all duration-300 rounded-full ${i === activeImageIndex ? 'w-5 bg-theme-accent' : 'w-1.5 bg-white/50'}`}
                 />
               ))}
@@ -167,7 +204,10 @@ export const PropertyDetailsPage: React.FC<PropertyDetailsPageProps> = ({
         {/* Tablet & Desktop Layout Bento Grid */}
         <div className="hidden md:grid grid-cols-4 grid-rows-2 gap-3 aspect-[21/9] bg-[#1c1c1e] rounded-3xl overflow-hidden relative group border border-theme-border/50 shadow-md">
           {/* Primary Main Image */}
-          <div className="col-span-2 row-span-2 overflow-hidden relative cursor-pointer group/item">
+          <div 
+            onClick={() => setGalleryIndex(0)}
+            className="col-span-2 row-span-2 overflow-hidden relative cursor-pointer group/item"
+          >
             <LazyImage 
               src={galleryImages[0]} 
               alt={property.title} 
@@ -176,7 +216,10 @@ export const PropertyDetailsPage: React.FC<PropertyDetailsPageProps> = ({
             />
           </div>
           {/* Secondary Grid Blocks */}
-          <div className="overflow-hidden relative cursor-pointer">
+          <div 
+            onClick={() => setGalleryIndex(1)}
+            className="overflow-hidden relative cursor-pointer"
+          >
             <LazyImage 
               src={galleryImages[1]} 
               alt={property.title} 
@@ -184,7 +227,10 @@ export const PropertyDetailsPage: React.FC<PropertyDetailsPageProps> = ({
               referrerPolicy="no-referrer"
             />
           </div>
-          <div className="overflow-hidden relative cursor-pointer">
+          <div 
+            onClick={() => setGalleryIndex(2)}
+            className="overflow-hidden relative cursor-pointer"
+          >
             <LazyImage 
               src={galleryImages[2]} 
               alt={property.title} 
@@ -192,7 +238,10 @@ export const PropertyDetailsPage: React.FC<PropertyDetailsPageProps> = ({
               referrerPolicy="no-referrer"
             />
           </div>
-          <div className="overflow-hidden relative cursor-pointer">
+          <div 
+            onClick={() => setGalleryIndex(3)}
+            className="overflow-hidden relative cursor-pointer"
+          >
             <LazyImage 
               src={galleryImages[3]} 
               alt={property.title} 
@@ -200,7 +249,10 @@ export const PropertyDetailsPage: React.FC<PropertyDetailsPageProps> = ({
               referrerPolicy="no-referrer"
             />
           </div>
-          <div className="overflow-hidden relative cursor-pointer">
+          <div 
+            onClick={() => setGalleryIndex(4)}
+            className="overflow-hidden relative cursor-pointer"
+          >
             <LazyImage 
               src={galleryImages[4]} 
               alt={property.title} 
@@ -208,6 +260,15 @@ export const PropertyDetailsPage: React.FC<PropertyDetailsPageProps> = ({
               referrerPolicy="no-referrer"
             />
           </div>
+
+          {/* Show All Photos button */}
+          <button
+            onClick={() => setGalleryIndex(0)}
+            className="absolute bottom-5 right-5 px-4 py-2 bg-black/75 hover:bg-black/90 backdrop-blur-md text-white text-[10px] font-black uppercase tracking-wider rounded-xl border border-white/20 transition-all flex items-center gap-1.5 shadow-md cursor-pointer z-10"
+          >
+            <LayoutGrid className="w-3.5 h-3.5" />
+            <span>Show all photos</span>
+          </button>
         </div>
 
         {/* 3. CORE CONTENT GRID EXPANSION */}
@@ -596,6 +657,12 @@ export const PropertyDetailsPage: React.FC<PropertyDetailsPageProps> = ({
                 No subscription charges. Direct landlord interactions guarantee safe transactions.
               </p>
 
+              {/* Phase 6: Verification Trust Card */}
+              <div className="pt-4 border-t border-theme-border space-y-3">
+                <PropertyVerificationCard propertyId={property.id} />
+                <PublicVerificationTimeline propertyId={property.id} />
+              </div>
+
             </div>
           </div>
 
@@ -603,6 +670,17 @@ export const PropertyDetailsPage: React.FC<PropertyDetailsPageProps> = ({
 
       </div>
 
+      {/* Fullscreen Premium Media Viewer Modal */}
+      {galleryIndex !== null && (
+        <FullscreenGallery
+          propertySlug={property.slug || property.id}
+          mediaItems={fullMediaItems}
+          initialIndex={galleryIndex}
+          isOpen={galleryIndex !== null}
+          onClose={() => setGalleryIndex(null)}
+          isOwner={false}
+        />
+      )}
     </div>
   );
 };

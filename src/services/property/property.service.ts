@@ -2,15 +2,39 @@ import { supabase } from '@inhaby/shared';
 import { Property, Section } from '../../types';
 
 export function mapSupabasePropertyToModel(dbProp: any): Property {
-  const coverImage = dbProp.images?.find((img: any) => img.is_cover)?.url || dbProp.images?.[0]?.url || 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&q=80&w=400';
+  const mediaList = dbProp.property_media || dbProp.images || [];
+  
+  // Sort by sort_order
+  const sortedMediaList = [...mediaList].sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0));
+
+  const coverImage = sortedMediaList.find((img: any) => img.is_cover || img.is_cover === true)?.public_url || 
+                     sortedMediaList.find((img: any) => img.is_cover || img.is_cover === true)?.url || 
+                     sortedMediaList[0]?.public_url || 
+                     sortedMediaList[0]?.url || 
+                     'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&q=80&w=400';
+  
   // Use slug if available, fall back to id so navigation never silently fails
   const slug = dbProp.slug || dbProp.id;
+
+  const mappedMedia = sortedMediaList.map((img: any) => ({
+    id: img.id,
+    url: img.public_url || img.url,
+    category: img.room_override || img.ai_analysis?.roomType || img.category || 'Other',
+    version: img.version || 1,
+    edited: img.edited || false,
+    ai_analysis: img.ai_analysis,
+    created_at: img.created_at || img.edited_at,
+    is_cover: img.is_cover || false,
+    size_bytes: img.size_bytes
+  }));
+
   return {
     id: dbProp.id,
     slug,
     title: dbProp.title,
     image: coverImage,
-    images: dbProp.images?.map((img: any) => img.url) || [coverImage],
+    images: mappedMedia.map(m => m.url),
+    mediaItems: mappedMedia, // Attach full metadata items list
     tag: dbProp.is_featured ? 'PREMIUM' : undefined,
     details: `${dbProp.bedrooms} BHK • ${dbProp.bathrooms} Bath • ${dbProp.area_sqft || 0} sq. ft.`,
     description: dbProp.description || '',
@@ -56,6 +80,7 @@ export const propertyService = {
       .from('properties')
       .select(`
         *,
+        property_media(*),
         images: property_images(*),
         amenities: amenities(*),
         owner: owner_profiles(*)
@@ -73,6 +98,7 @@ export const propertyService = {
       .from('properties')
       .select(`
         *,
+        property_media(*),
         images: property_images(*),
         amenities: amenities(*),
         owner: owner_profiles(*)
@@ -92,6 +118,7 @@ export const propertyService = {
       .from('properties')
       .select(`
         *,
+        property_media(*),
         images: property_images(*),
         amenities: amenities(*),
         owner: owner_profiles(*)
