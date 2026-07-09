@@ -28,6 +28,15 @@ export function mapSupabasePropertyToModel(dbProp: any): Property {
     size_bytes: img.size_bytes
   }));
 
+  const loc = dbProp.property_locations?.[0] || dbProp.property_locations || {};
+  const lat = loc.latitude !== undefined ? Number(loc.latitude) : (dbProp.coordinates?.lat || 12.9716);
+  const lng = loc.longitude !== undefined ? Number(loc.longitude) : (dbProp.coordinates?.lng || 77.5946);
+  const area = loc.area || dbProp.locality || '';
+  const city = loc.city || dbProp.city || '';
+  const pincode = loc.pincode || '';
+  const houseNumber = loc.house_number || '';
+  const buildingName = loc.building_name || '';
+
   return {
     id: dbProp.id,
     slug,
@@ -44,9 +53,12 @@ export function mapSupabasePropertyToModel(dbProp: any): Property {
     bedrooms: dbProp.bedrooms,
     furnished: dbProp.furnishing === 'Fully Furnished',
     category: dbProp.property_type === 'PG' ? 'pgs' : dbProp.property_type === 'Villa' ? 'villas' : dbProp.property_type === 'House' ? 'homes' : dbProp.property_type === 'Room' ? 'rooms' : 'apartments',
-    location: `${dbProp.address_line ? dbProp.address_line + ', ' : ''}${dbProp.locality || ''}, ${dbProp.city || ''}`,
-    area: dbProp.locality || '',
-    city: dbProp.city || '',
+    location: `${houseNumber ? houseNumber + ', ' : ''}${buildingName ? buildingName + ', ' : ''}${area || ''}, ${city || ''}`,
+    area,
+    city,
+    pincode,
+    houseNumber,
+    buildingName,
     amenities: dbProp.amenities?.map((a: any) => ({ icon: 'Zap', label: a.name })) || [],
     rating: 4.5,
     reviewCount: 12,
@@ -57,8 +69,8 @@ export function mapSupabasePropertyToModel(dbProp: any): Property {
     size: `${dbProp.area_sqft || 0} sq. ft.`,
     floor: `${dbProp.floor || 1} Floor`,
     facing: dbProp.facing || 'East',
-    latitude: dbProp.coordinates?.lat,
-    longitude: dbProp.coordinates?.lng,
+    latitude: lat,
+    longitude: lng,
     verification_status: dbProp.status === 'approved' ? 'verified' : 'unverified',
     property_type: dbProp.property_type,
     owner: {
@@ -83,7 +95,8 @@ export const propertyService = {
         property_media(*),
         images: property_images(*),
         amenities: amenities(*),
-        owner: owner_profiles(*)
+        owner: owner_profiles(*),
+        property_locations(*)
       `)
       .eq('slug', slug)
       .maybeSingle();
@@ -101,7 +114,8 @@ export const propertyService = {
         property_media(*),
         images: property_images(*),
         amenities: amenities(*),
-        owner: owner_profiles(*)
+        owner: owner_profiles(*),
+        property_locations(*)
       `)
       .eq('id', slug)
       .maybeSingle();
@@ -121,7 +135,8 @@ export const propertyService = {
         property_media(*),
         images: property_images(*),
         amenities: amenities(*),
-        owner: owner_profiles(*)
+        owner: owner_profiles(*),
+        property_locations(*)
       `)
       .eq('id', id)
       .maybeSingle();

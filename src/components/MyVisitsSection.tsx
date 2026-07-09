@@ -2,6 +2,8 @@ import React from 'react';
 import { Footprints, CalendarDays, MessageCircle, Phone, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
 import { VisitRequest, Property } from '../types';
 import { VirtualItem } from './VirtualItem';
+import { VisitNavigationDashboard } from '@inhaby/shared';
+
 
 interface MyVisitsSectionProps {
   visitRequests: VisitRequest[];
@@ -24,6 +26,7 @@ export const MyVisitsSection: React.FC<MyVisitsSectionProps> = ({
   onStartBrowsing
 }) => {
   const [activeSubTab, setActiveSubTab] = React.useState<'pending' | 'approved' | 'rejected'>('pending');
+  const [expandedVisitId, setExpandedVisitId] = React.useState<string | null>(null);
 
   // Filter requests
   const filteredRequests = visitRequests.filter(req => {
@@ -164,6 +167,42 @@ export const MyVisitsSection: React.FC<MyVisitsSectionProps> = ({
                         </div>
                       )}
                     </div>
+
+                    {activeSubTab === 'approved' && (
+                      <div className="mt-3">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedVisitId(expandedVisitId === req.id ? null : req.id)}
+                          className="w-full bg-theme-accent-soft text-theme-accent hover:bg-theme-accent-soft/80 py-2 rounded-xl font-bold text-[9px] uppercase tracking-wider transition-colors cursor-pointer"
+                        >
+                          {expandedVisitId === req.id ? 'Close Navigation Console ▲' : 'Open Navigation Console ▼'}
+                        </button>
+                        
+                        {expandedVisitId === req.id && (
+                          <div className="mt-2 border-t border-theme-border/40 pt-2 text-left">
+                            <VisitNavigationDashboard
+                              visit={{
+                                ...req,
+                                status: req.status as any,
+                                entryInstructions: (req as any).entryInstructions || {
+                                  buildingName: prop.title,
+                                  gateNumber: 'Gate 2',
+                                  floor: '3rd Floor',
+                                  doorNumber: 'Flat 304',
+                                  entryInstructions: 'Show visitor gate pass at security guard post.'
+                                }
+                              }}
+                              propertyCoords={prop.coordinates || { lat: 12.9716, lng: 77.5946 }}
+                              exactAddress={prop.address || 'Address'}
+                              isDark={false}
+                              onStatusChange={(newStatus) => {
+                                setVisitRequests(prev => prev.map(v => v.id === req.id ? { ...v, status: newStatus as any } : v));
+                              }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                   </div>
 

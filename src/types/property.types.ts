@@ -32,6 +32,9 @@ export interface Property {
   distance?: number;
   area?: string;
   city?: string;
+  pincode?: string;
+  houseNumber?: string;
+  buildingName?: string;
   owner: {
     name: string;
     image: string;

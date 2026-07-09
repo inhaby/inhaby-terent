@@ -30,6 +30,8 @@ import { LazyImage } from './LazyImage';
 import { searchService } from '../services/search/search.service';
 import { VirtualItem } from './VirtualItem';
 import { PropertySearchMap } from './PropertySearchMap';
+import { SmartSearchDropdown, sortProperties, filterByRadius } from '@inhaby/shared';
+
 
 const CITIES = ['Bengaluru', 'Mysuru', 'Hubballi', 'Mangaluru', 'Belagavi', 'Kalaburagi', 'Davanagere', 'Shivamogga'];
 
@@ -351,10 +353,26 @@ export const SearchPage: React.FC<SearchPageProps> = ({
 
     searchService.searchProperties(searchParams)
       .then(data => {
-        setResults(data.items || []);
-        setTotalResults(data.total || 0);
-        setTotalPages(data.totalPages || 1);
+        let items = data.items || [];
+        
+        // 1. Apply radius filtering if coordinates are active (defaulting to 5km limit)
+        if (lat !== null && lng !== null) {
+          items = filterByRadius(items, { lat, lng }, 5000);
+        }
+
+        // 2. Sort properties
+        const searchCoords = lat !== null && lng !== null ? { lat, lng } : undefined;
+        items = sortProperties(items, sortBy, searchCoords);
+
+        setResults(items);
+        setTotalResults(items.length);
+        setTotalPages(1);
         setLoading(false);
+
+        // 3. Log search analytics
+        import('@inhaby/shared').then(({ logSearchAnalytics }) => {
+          logSearchAnalytics(submittedQuery, items.length, items.length === 0, 'text');
+        });
       })
       .catch(err => {
         console.error("Error searching stays", err);
@@ -532,55 +550,26 @@ export const SearchPage: React.FC<SearchPageProps> = ({
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 4 }}
                   exit={{ opacity: 0, y: 10 }}
-                  className="absolute left-0 right-0 top-full z-[100] bg-theme-surface border border-theme-border shadow-2xl rounded-2xl py-2 overflow-hidden text-sm"
+                  className="absolute left-0 right-0 top-full z-[100] bg-theme-surface border border-theme-border shadow-2xl rounded-2xl py-2 overflow-hidden text-sm w-full max-h-[350px] overflow-y-auto"
                 >
-                  <div className="px-4 py-1 flex items-center justify-between border-b border-theme-border/40 pb-1.5 text-[8px] font-black uppercase tracking-wider text-theme-text-secondary/60">
-                    <span>{query.trim() ? "Matches Found" : "Recent Searches"}</span>
-                    <TrendingUp size={9} className="text-theme-accent" />
-                  </div>
-                  
-                  <div className="max-h-[250px] overflow-y-auto no-scrollbar py-1">
-                    {suggestions.map((item, idx) => {
-                      const isActive = idx === activeIndex;
-                      return (
-                        <div
-                          key={idx}
-                          onClick={() => {
-                            if (item.type === 'property' && item.id) {
-                              onSelectProperty(item.id);
-                            } else {
-                              handleSearchSubmit(item.text);
-                            }
-                          }}
-                          onMouseEnter={() => setActiveIndex(idx)}
-                          className={`px-4 py-2.5 flex items-start gap-3 cursor-pointer transition-all ${
-                            isActive ? 'bg-theme-accent-soft text-theme-text-primary border-l-4 border-theme-accent' : 'border-l-4 border-transparent hover:bg-theme-bg/40'
-                          }`}
-                        >
-                          <div className={`p-1.5 rounded-lg shrink-0 ${
-                            item.type === 'recent' ? 'bg-zinc-500/10 text-zinc-500' :
-                            item.type === 'area' ? 'bg-blue-500/10 text-blue-500' :
-                            item.type === 'property' ? 'bg-emerald-500/10 text-emerald-500' :
-                            item.type === 'city' ? 'bg-purple-500/10 text-purple-500' : 'bg-theme-accent-soft text-theme-accent'
-                          }`}>
-                            {item.type === 'recent' && <Clock size={12} />}
-                            {item.type === 'area' && <MapPin size={12} />}
-                            {item.type === 'property' && <Building size={12} />}
-                            {item.type === 'city' && <Compass size={12} />}
-                            {(item.type === 'suggestion' || item.type === 'trending') && <TrendingUp size={12} />}
-                          </div>
-                          <div className="flex flex-col min-w-0">
-                            <span className="font-bold text-xs truncate text-theme-text-primary leading-tight">
-                              {item.text}
-                            </span>
-                            <span className="text-[9px] text-theme-text-secondary leading-none mt-0.5">
-                              {item.subtext}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <SmartSearchDropdown
+                    userId="tenant-user-id"
+                    query={query}
+                    isDark={isDark}
+                    recentSearches={recentSearches}
+                    onClearRecent={() => {
+                      setRecentSearches([]);
+                      localStorage.removeItem('homstay-recent-searches');
+                    }}
+                    onSelectSearch={(term, pinLat, pinLng) => {
+                      if (pinLat && pinLng) {
+                        setLat(pinLat);
+                        setLng(pinLng);
+                        setLocationName(term);
+                      }
+                      handleSearchSubmit(term);
+                    }}
+                  />
                 </motion.div>
               )}
             </AnimatePresence>

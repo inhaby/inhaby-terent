@@ -34,6 +34,8 @@ import { LazyImage } from './LazyImage';
 import { FullscreenGallery } from './property/FullscreenGallery';
 import PropertyVerificationCard from './property/PropertyVerificationCard';
 import PublicVerificationTimeline from './property/PublicVerificationTimeline';
+import { GoogleMapsProvider, PropertyMiniMap, PropertyFullMap, fetchLocationIntelligence, LocationIntelligenceSection } from '@inhaby/shared';
+
 
 const AMENITY_ICONS: Record<string, any> = {
   Waves, Dumbbell, ShieldCheck, Zap, Wifi, Car, Coffee, Utensils, Tv, Wind
@@ -75,6 +77,27 @@ export const PropertyDetailsPage: React.FC<PropertyDetailsPageProps> = ({
   const [galleryIndex, setGalleryIndex] = React.useState<number | null>(
     initialGalleryIndex !== undefined ? initialGalleryIndex : null
   );
+  const [isFullMapOpen, setIsFullMapOpen] = React.useState(false);
+  const [intelligence, setIntelligence] = React.useState<any | null>(null);
+  const [loadingIntel, setLoadingIntel] = React.useState(false);
+
+  React.useEffect(() => {
+    if (property && property.latitude && property.longitude) {
+      setLoadingIntel(true);
+      fetchLocationIntelligence(property.id, property.latitude, property.longitude)
+        .then(res => {
+          setIntelligence(res);
+        })
+        .catch(err => {
+          console.error(err);
+        })
+        .finally(() => {
+          setLoadingIntel(false);
+        });
+    }
+  }, [property?.id, property?.latitude, property?.longitude]);
+
+
 
   React.useEffect(() => {
     // Scroll to the top when navigating to a new property page
@@ -380,53 +403,50 @@ export const PropertyDetailsPage: React.FC<PropertyDetailsPageProps> = ({
               <h2 id="property-section-location" className="font-serif text-2xl sm:text-3xl font-medium text-theme-text-primary">
                 Explore the Location
               </h2>
-              <p className="text-xs font-bold text-theme-text-secondary leading-relaxed flex items-center gap-1.5 animate-in fade-in">
-                <MapPin size={14} className="text-theme-accent stroke-[2.5]" />
-                {visitStatus === 'completed' ? property.location : `${property.location.split(',').slice(-2).join(', ').trim()} (Approximate Area)`}
-              </p>
               
-              <div className="relative rounded-3xl overflow-hidden aspect-video max-h-[300px] border border-theme-border">
-                {visitStatus === 'completed' ? (
-                  <>
-                    <LazyImage 
-                      src="https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&q=80&w=800" 
-                      alt="City Blueprint Map" 
-                      className="w-full h-full object-cover grayscale"
-                    />
-                    <div className="absolute inset-0 flex items-center justify-center bg-theme-accent/5 pointer-events-none">
-                      <div className="relative flex items-center justify-center">
-                        <div className="absolute w-36 h-36 border border-theme-accent bg-theme-accent/15 rounded-full animate-ping duration-1000 opacity-25"></div>
-                        <div className="absolute w-28 h-28 border border-theme-accent bg-theme-accent/5 rounded-full opacity-60"></div>
-                        <div className="bg-theme-surface p-3.5 rounded-2xl shadow-xl text-theme-accent border border-theme-border flex items-center gap-2">
-                          <MapPin size={20} fill="currentColor" className="stroke-[2.5]" />
-                          <span className="text-[10px] font-black uppercase tracking-wider">~10 Min Walk Radius</span>
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="absolute inset-0 bg-theme-bg filter blur-[6px] opacity-75">
-                      <LazyImage 
-                        src="https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&q=80&w=800" 
-                        alt="Blurred Map Preview" 
-                        className="w-full h-full object-cover scale-110 pointer-events-none"
+              <GoogleMapsProvider>
+                <div className="relative rounded-3xl overflow-hidden border border-theme-border p-4 bg-theme-surface">
+                  <PropertyMiniMap
+                    propertyId={property.id}
+                    latitude={property.latitude || 12.9716}
+                    longitude={property.longitude || 77.5946}
+                    area={property.area || ''}
+                    city={property.city || ''}
+                    pincode={property.pincode || ''}
+                    buildingName={property.buildingName || ''}
+                    houseNumber={property.houseNumber || ''}
+                    hasExactAccess={visitStatus === 'approved' || visitStatus === 'completed'}
+                    isDark={false}
+                    onOpenFullMap={() => setIsFullMapOpen(true)}
+                  />
+                </div>
+
+                {isFullMapOpen && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+                    <div className="bg-theme-surface border border-theme-border rounded-3xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto relative shadow-2xl">
+                      <PropertyFullMap
+                        propertyId={property.id}
+                        latitude={property.latitude || 12.9716}
+                        longitude={property.longitude || 77.5946}
+                        hasExactAccess={visitStatus === 'approved' || visitStatus === 'completed'}
+                        isDark={false}
+                        onClose={() => setIsFullMapOpen(false)}
                       />
                     </div>
-                    <div className="absolute inset-0 bg-black/45 dark:bg-black/75 flex flex-col items-center justify-center text-center p-6 space-y-3 z-10">
-                      <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl text-white border border-white/20">
-                        <MapPin size={24} className="stroke-[2.5] text-amber-400" />
-                      </div>
-                      <div className="space-y-1">
-                        <span className="text-white text-xs font-black uppercase tracking-widest block">Exact Location Hidden</span>
-                        <p className="text-white/70 text-[10px] max-w-[280px] font-semibold leading-normal">
-                          Exact location details and interactive maps are unlocked after the owner accepts your visit request.
-                        </p>
-                      </div>
-                    </div>
-                  </>
+                  </div>
                 )}
-              </div>
+              </GoogleMapsProvider>
+
+              {/* Location Intelligence Section */}
+              {loadingIntel ? (
+                <div className="p-6 bg-theme-surface border border-theme-border rounded-3xl text-center text-xs text-theme-text-secondary">
+                  Loading location intelligence...
+                </div>
+              ) : intelligence ? (
+                <div className="p-6 bg-theme-surface border border-theme-border rounded-3xl space-y-4">
+                  <LocationIntelligenceSection intelligence={intelligence} isDark={false} />
+                </div>
+              ) : null}
             </div>
 
             {/* STRENGTHENED HEADINGS & EXPANDED OWNER SECTION */}

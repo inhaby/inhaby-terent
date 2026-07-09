@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { APIProvider, Map, AdvancedMarker, Pin, InfoWindow } from '@vis.gl/react-google-maps';
 import { Property } from '../types';
 import { MapPin, Star, ExternalLink, Sliders, Settings, ShieldCheck } from 'lucide-react';
+import { getApproximateCoordinates } from '@inhaby/shared';
 
 const API_KEY =
   process.env.GOOGLE_MAPS_PLATFORM_KEY ||
@@ -136,15 +137,8 @@ export const PropertySearchMap: React.FC<PropertySearchMapProps> = ({
     );
   }
 
-  // Deterministic offset to shift location by 300m for privacy
   const getApproximateCoords = (id: string, lat: number, lng: number) => {
-    const offsetCode = id.split('-').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    const latOffset = ((offsetCode % 5) - 2) * 0.0012; // Small shift
-    const lngOffset = (((offsetCode + 3) % 5) - 2) * 0.0012;
-    return {
-      lat: lat + latOffset,
-      lng: lng + lngOffset
-    };
+    return getApproximateCoordinates(id, lat, lng);
   };
 
   return (
