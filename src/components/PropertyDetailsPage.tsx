@@ -26,7 +26,8 @@ import {
   CalendarDays,
   Sparkles,
   ShieldAlert,
-  ArrowLeft
+  ArrowLeft,
+  CameraOff
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Property, VisitRequest } from '../types';
@@ -34,7 +35,10 @@ import { LazyImage } from './LazyImage';
 import { FullscreenGallery } from './property/FullscreenGallery';
 import PropertyVerificationCard from './property/PropertyVerificationCard';
 import PublicVerificationTimeline from './property/PublicVerificationTimeline';
-import { GoogleMapsProvider, PropertyMiniMap, PropertyFullMap, fetchLocationIntelligence, LocationIntelligenceSection } from '@inhaby/shared';
+import { fetchLocationIntelligence } from '@inhaby/shared';
+import { PropertyMiniMap } from './googleMaps/PropertyMiniMap';
+import { PropertyFullMap } from './googleMaps/PropertyFullMap';
+import { LocationIntelligenceSection } from './googleMaps/LocationIntelligenceSection';
 
 
 const AMENITY_ICONS: Record<string, any> = {
@@ -116,7 +120,8 @@ export const PropertyDetailsPage: React.FC<PropertyDetailsPageProps> = ({
     if (property.mediaItems && property.mediaItems.length > 0) {
       return property.mediaItems;
     }
-    const urls = property.images && property.images.length > 0 ? property.images : [property.image];
+    const urls = property.images && property.images.length > 0 ? property.images : (property.image ? [property.image] : []);
+    if (urls.length === 0) return [];
     return urls.map((url, idx) => ({
       id: `media-${idx}`,
       url,
@@ -143,14 +148,12 @@ export const PropertyDetailsPage: React.FC<PropertyDetailsPageProps> = ({
     );
   }
 
-  // Guarantee we have at least 5 images for the desktop layout (repeat if necessary)
+  // Canonical gallery images list (no duplication)
   const galleryImages = React.useMemo(() => {
-    let list = [...(property.images || [])];
-    if (list.length === 0) list = [property.image];
-    while (list.length < 5) {
-      list.push(...list);
-    }
-    return list.slice(0, 5);
+    if (!property) return [];
+    if (property.images && property.images.length > 0) return property.images;
+    if (property.image) return [property.image];
+    return [];
   }, [property]);
 
   return (
@@ -197,14 +200,21 @@ export const PropertyDetailsPage: React.FC<PropertyDetailsPageProps> = ({
         {/* Mobile Gallery (Carousel) */}
         <div 
           onClick={() => setGalleryIndex(activeImageIndex)}
-          className="block md:hidden relative aspect-[4/3] rounded-2xl overflow-hidden bg-black select-none pointer-events-auto cursor-pointer"
+          className="block md:hidden relative aspect-[16/9] rounded-2xl overflow-hidden bg-black select-none pointer-events-auto cursor-pointer"
         >
-          <LazyImage 
-            src={property.images?.[activeImageIndex] || property.image} 
-            alt={property.title} 
-            className="w-full h-full object-cover opacity-95 transition-all duration-350"
-            referrerPolicy="no-referrer"
-          />
+          {(property.images?.[activeImageIndex] || property.image) ? (
+            <LazyImage 
+              src={property.images?.[activeImageIndex] || property.image} 
+              alt={property.title} 
+              className="w-full h-full object-contain opacity-95 transition-all duration-350"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <div className="w-full h-full bg-zinc-100 flex flex-col items-center justify-center text-zinc-400">
+              <CameraOff className="w-10 h-10 mb-2" />
+              <span className="text-xs font-bold uppercase tracking-wider">No photos available</span>
+            </div>
+          )}
           <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 via-transparent to-transparent h-1/3 pointer-events-none" />
           
           {/* Dot Controls */}
@@ -224,74 +234,100 @@ export const PropertyDetailsPage: React.FC<PropertyDetailsPageProps> = ({
           )}
         </div>
 
-        {/* Tablet & Desktop Layout Bento Grid */}
-        <div className="hidden md:grid grid-cols-4 grid-rows-2 gap-3 aspect-[21/9] bg-[#1c1c1e] rounded-3xl overflow-hidden relative group border border-theme-border/50 shadow-md">
-          {/* Primary Main Image */}
-          <div 
-            onClick={() => setGalleryIndex(0)}
-            className="col-span-2 row-span-2 overflow-hidden relative cursor-pointer group/item"
-          >
-            <LazyImage 
-              src={galleryImages[0]} 
-              alt={property.title} 
-              className="w-full h-full object-cover transition-transform duration-700 hover:scale-103"
-              referrerPolicy="no-referrer"
-            />
-          </div>
-          {/* Secondary Grid Blocks */}
-          <div 
-            onClick={() => setGalleryIndex(1)}
-            className="overflow-hidden relative cursor-pointer"
-          >
-            <LazyImage 
-              src={galleryImages[1]} 
-              alt={property.title} 
-              className="w-full h-full object-cover transition-transform duration-700 hover:scale-103"
-              referrerPolicy="no-referrer"
-            />
-          </div>
-          <div 
-            onClick={() => setGalleryIndex(2)}
-            className="overflow-hidden relative cursor-pointer"
-          >
-            <LazyImage 
-              src={galleryImages[2]} 
-              alt={property.title} 
-              className="w-full h-full object-cover transition-transform duration-700 hover:scale-103"
-              referrerPolicy="no-referrer"
-            />
-          </div>
-          <div 
-            onClick={() => setGalleryIndex(3)}
-            className="overflow-hidden relative cursor-pointer"
-          >
-            <LazyImage 
-              src={galleryImages[3]} 
-              alt={property.title} 
-              className="w-full h-full object-cover transition-transform duration-700 hover:scale-103"
-              referrerPolicy="no-referrer"
-            />
-          </div>
-          <div 
-            onClick={() => setGalleryIndex(4)}
-            className="overflow-hidden relative cursor-pointer"
-          >
-            <LazyImage 
-              src={galleryImages[4]} 
-              alt={property.title} 
-              className="w-full h-full object-cover transition-transform duration-700 hover:scale-103"
-              referrerPolicy="no-referrer"
-            />
-          </div>
+        {/* Tablet & Desktop Dynamic Gallery Grid */}
+        <div className="hidden md:block">
+          {galleryImages.length === 0 && (
+            <div className="aspect-[16/9] bg-[#1c1c1e] rounded-3xl overflow-hidden flex flex-col items-center justify-center text-zinc-400 border border-theme-border/50 shadow-md">
+              <CameraOff className="w-12 h-12 mb-2" />
+              <span className="text-xs font-bold uppercase tracking-wider">No photos available for this property</span>
+            </div>
+          )}
 
-          {/* Show All Photos button */}
-          <button
-            onClick={() => setGalleryIndex(0)}
-            className="absolute bottom-5 right-5 px-4 py-2 bg-black/75 hover:bg-black/90 backdrop-blur-md text-white text-[10px] font-black uppercase tracking-wider rounded-xl border border-white/20 transition-all flex items-center gap-1.5 shadow-md cursor-pointer z-10"
-          >
-            <LayoutGrid className="w-3.5 h-3.5" />
-            <span>Show all photos</span>
-          </button>
+          {galleryImages.length === 1 && (
+            <div 
+              onClick={() => setGalleryIndex(0)}
+              className="aspect-[16/9] bg-[#1c1c1e] rounded-3xl overflow-hidden relative cursor-pointer group border border-theme-border/50 shadow-md flex items-center justify-center"
+            >
+              <LazyImage 
+                src={galleryImages[0]} 
+                alt={property.title} 
+                className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-102"
+                referrerPolicy="no-referrer"
+              />
+            </div>
+          )}
+
+          {galleryImages.length === 2 && (
+            <div className="grid grid-cols-2 gap-3 aspect-[16/9] bg-[#1c1c1e] rounded-3xl overflow-hidden relative group border border-theme-border/50 shadow-md">
+              <div onClick={() => setGalleryIndex(0)} className="overflow-hidden relative cursor-pointer h-full">
+                <LazyImage src={galleryImages[0]} alt={property.title} className="w-full h-full object-cover transition-transform duration-700 hover:scale-103" referrerPolicy="no-referrer" />
+              </div>
+              <div onClick={() => setGalleryIndex(1)} className="overflow-hidden relative cursor-pointer h-full">
+                <LazyImage src={galleryImages[1]} alt={property.title} className="w-full h-full object-cover transition-transform duration-700 hover:scale-103" referrerPolicy="no-referrer" />
+              </div>
+            </div>
+          )}
+
+          {galleryImages.length === 3 && (
+            <div className="grid grid-cols-3 gap-3 aspect-[16/9] bg-[#1c1c1e] rounded-3xl overflow-hidden relative group border border-theme-border/50 shadow-md">
+              <div onClick={() => setGalleryIndex(0)} className="col-span-2 overflow-hidden relative cursor-pointer h-full">
+                <LazyImage src={galleryImages[0]} alt={property.title} className="w-full h-full object-cover transition-transform duration-700 hover:scale-103" referrerPolicy="no-referrer" />
+              </div>
+              <div className="grid grid-rows-2 gap-3 h-full">
+                <div onClick={() => setGalleryIndex(1)} className="overflow-hidden relative cursor-pointer h-full">
+                  <LazyImage src={galleryImages[1]} alt={property.title} className="w-full h-full object-cover transition-transform duration-700 hover:scale-103" referrerPolicy="no-referrer" />
+                </div>
+                <div onClick={() => setGalleryIndex(2)} className="overflow-hidden relative cursor-pointer h-full">
+                  <LazyImage src={galleryImages[2]} alt={property.title} className="w-full h-full object-cover transition-transform duration-700 hover:scale-103" referrerPolicy="no-referrer" />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {galleryImages.length === 4 && (
+            <div className="grid grid-cols-4 grid-rows-2 gap-3 aspect-[16/9] bg-[#1c1c1e] rounded-3xl overflow-hidden relative group border border-theme-border/50 shadow-md">
+              <div onClick={() => setGalleryIndex(0)} className="col-span-2 row-span-2 overflow-hidden relative cursor-pointer">
+                <LazyImage src={galleryImages[0]} alt={property.title} className="w-full h-full object-cover transition-transform duration-700 hover:scale-103" referrerPolicy="no-referrer" />
+              </div>
+              <div onClick={() => setGalleryIndex(1)} className="overflow-hidden relative cursor-pointer">
+                <LazyImage src={galleryImages[1]} alt={property.title} className="w-full h-full object-cover transition-transform duration-700 hover:scale-103" referrerPolicy="no-referrer" />
+              </div>
+              <div onClick={() => setGalleryIndex(2)} className="overflow-hidden relative cursor-pointer">
+                <LazyImage src={galleryImages[2]} alt={property.title} className="w-full h-full object-cover transition-transform duration-700 hover:scale-103" referrerPolicy="no-referrer" />
+              </div>
+              <div onClick={() => setGalleryIndex(3)} className="col-span-2 overflow-hidden relative cursor-pointer">
+                <LazyImage src={galleryImages[3]} alt={property.title} className="w-full h-full object-cover transition-transform duration-700 hover:scale-103" referrerPolicy="no-referrer" />
+              </div>
+            </div>
+          )}
+
+          {galleryImages.length >= 5 && (
+            <div className="grid grid-cols-4 grid-rows-2 gap-3 aspect-[16/9] bg-[#1c1c1e] rounded-3xl overflow-hidden relative group border border-theme-border/50 shadow-md">
+              <div onClick={() => setGalleryIndex(0)} className="col-span-2 row-span-2 overflow-hidden relative cursor-pointer">
+                <LazyImage src={galleryImages[0]} alt={property.title} className="w-full h-full object-cover transition-transform duration-700 hover:scale-103" referrerPolicy="no-referrer" />
+              </div>
+              <div onClick={() => setGalleryIndex(1)} className="overflow-hidden relative cursor-pointer">
+                <LazyImage src={galleryImages[1]} alt={property.title} className="w-full h-full object-cover transition-transform duration-700 hover:scale-103" referrerPolicy="no-referrer" />
+              </div>
+              <div onClick={() => setGalleryIndex(2)} className="overflow-hidden relative cursor-pointer">
+                <LazyImage src={galleryImages[2]} alt={property.title} className="w-full h-full object-cover transition-transform duration-700 hover:scale-103" referrerPolicy="no-referrer" />
+              </div>
+              <div onClick={() => setGalleryIndex(3)} className="overflow-hidden relative cursor-pointer">
+                <LazyImage src={galleryImages[3]} alt={property.title} className="w-full h-full object-cover transition-transform duration-700 hover:scale-103" referrerPolicy="no-referrer" />
+              </div>
+              <div onClick={() => setGalleryIndex(4)} className="overflow-hidden relative cursor-pointer">
+                <LazyImage src={galleryImages[4]} alt={property.title} className="w-full h-full object-cover transition-transform duration-700 hover:scale-103" referrerPolicy="no-referrer" />
+              </div>
+
+              <button
+                onClick={() => setGalleryIndex(0)}
+                className="absolute bottom-5 right-5 px-4 py-2 bg-black/75 hover:bg-black/90 backdrop-blur-md text-white text-[10px] font-black uppercase tracking-wider rounded-xl border border-white/20 transition-all flex items-center gap-1.5 shadow-md cursor-pointer z-10"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span>Show all {galleryImages.length} photos</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* 3. CORE CONTENT GRID EXPANSION */}
@@ -404,7 +440,6 @@ export const PropertyDetailsPage: React.FC<PropertyDetailsPageProps> = ({
                 Explore the Location
               </h2>
               
-              <GoogleMapsProvider>
                 <div className="relative rounded-3xl overflow-hidden border border-theme-border p-4 bg-theme-surface">
                   <PropertyMiniMap
                     propertyId={property.id}
@@ -435,7 +470,6 @@ export const PropertyDetailsPage: React.FC<PropertyDetailsPageProps> = ({
                     </div>
                   </div>
                 )}
-              </GoogleMapsProvider>
 
               {/* Location Intelligence Section */}
               {loadingIntel ? (

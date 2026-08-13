@@ -5,6 +5,8 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
+import multer from "multer";
+import nodemailer from "nodemailer";
 
 // Load environment variables
 dotenv.config();
@@ -135,6 +137,178 @@ async function startServer() {
       res.status(500).send("Error generating sitemap");
     }
   });
+
+  // Configure Multer for PDF upload in memory, with 5 MB file size limit
+  const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 } // 5 MB
+  });
+
+  // Handle preflight requests for careers application endpoint
+  app.options("/api/careers/apply", (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    res.sendStatus(200);
+  });
+
+  // Careers application submission endpoint
+  app.post(
+    "/api/careers/apply",
+    (req, res, next) => {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+      upload.single("resume")(req, res, (err: any) => {
+        if (err) {
+          if (err.code === "LIMIT_FILE_SIZE") {
+            return res.status(400).json({
+              success: false,
+              message: "File is too large. Maximum size allowed is 5 MB."
+            });
+          }
+          return res.status(400).json({
+            success: false,
+            message: err.message || "Failed to parse file upload."
+          });
+        }
+        next();
+      });
+    },
+    async (req, res) => {
+      try {
+        const {
+          firstName,
+          lastName,
+          email,
+          phone,
+          city,
+          state,
+          college,
+          degree,
+          graduationYear,
+          position,
+          coverLetter
+        } = req.body;
+
+        // Validation of required fields
+        if (
+          !firstName?.trim() ||
+          !lastName?.trim() ||
+          !email?.trim() ||
+          !phone?.trim() ||
+          !city?.trim() ||
+          !state?.trim() ||
+          !college?.trim() ||
+          !degree?.trim() ||
+          !graduationYear?.trim() ||
+          !coverLetter?.trim() ||
+          !req.file
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: "All fields are required, including your PDF resume."
+          });
+        }
+
+        // Validate file type
+        if (req.file.mimetype !== "application/pdf" && !req.file.originalname.toLowerCase().endsWith(".pdf")) {
+          return res.status(400).json({
+            success: false,
+            message: "Only PDF files are allowed."
+          });
+        }
+
+        // Validate email address format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email.trim())) {
+          return res.status(400).json({
+            success: false,
+            message: "Please enter a valid email address."
+          });
+        }
+
+        const applicantName = `${firstName} ${lastName}`.trim();
+        const resolvedPosition = position || "Full Stack Developer";
+        const subject = `New Application | ${resolvedPosition} | ${applicantName}`;
+
+        const bodyText = `New Job Application
+
+Position:
+${resolvedPosition}
+
+Name:
+${applicantName}
+
+Email:
+${email}
+
+Phone:
+${phone}
+
+City:
+${city}
+
+State:
+${state}
+
+College:
+${college}
+
+Degree:
+${degree}
+
+Graduation Year:
+${graduationYear}
+
+Portfolio / Online Profiles:
+${req.body.portfolio || "None provided"}
+
+Current Semester:
+${req.body.currentSemester || "N/A"}
+
+Cover Letter:
+${coverLetter}
+`;
+
+        const transporter = nodemailer.createTransport({
+          host: process.env.SMTP_HOST || "smtp.zoho.com",
+          port: Number(process.env.SMTP_PORT) || 465,
+          secure: Number(process.env.SMTP_PORT) !== 587, // secure: true for port 465
+          auth: {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS
+          }
+        });
+
+        await transporter.sendMail({
+          from: process.env.SMTP_FROM || process.env.SMTP_USER || "hr@inhaby.com",
+          to: "hr@inhaby.com",
+          replyTo: email,
+          subject: subject,
+          text: bodyText,
+          attachments: [
+            {
+              filename: req.file.originalname || "resume.pdf",
+              content: req.file.buffer,
+              contentType: "application/pdf"
+            }
+          ]
+        });
+
+        return res.status(200).json({
+          success: true
+        });
+      } catch (err: any) {
+        console.error("Application email sending failed:", err);
+        return res.status(500).json({
+          success: false,
+          message: "Unable to send application."
+        });
+      }
+    }
+  );
 
   // Setup Vite in Dev or serve Static files in Prod
   let vite: any;

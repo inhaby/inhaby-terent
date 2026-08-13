@@ -22,7 +22,8 @@ import {
   Clock,
   ShieldCheck,
   Grid,
-  Info
+  Info,
+  CameraOff
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Property, FilterState } from '../types';
@@ -30,7 +31,8 @@ import { LazyImage } from './LazyImage';
 import { searchService } from '../services/search/search.service';
 import { VirtualItem } from './VirtualItem';
 import { PropertySearchMap } from './PropertySearchMap';
-import { SmartSearchDropdown, sortProperties, filterByRadius } from '@inhaby/shared';
+import { sortProperties, filterByRadius } from '@inhaby/shared';
+import { SmartSearchDropdown } from './googleMaps/SmartSearchDropdown';
 
 
 const CITIES = ['Bengaluru', 'Mysuru', 'Hubballi', 'Mangaluru', 'Belagavi', 'Kalaburagi', 'Davanagere', 'Shivamogga'];
@@ -96,13 +98,20 @@ export const SearchPage: React.FC<SearchPageProps> = ({
             </span>
           )}
 
-          <div className="relative aspect-[4/3] overflow-hidden bg-theme-bg flex-shrink-0">
-            <LazyImage 
-              src={prop.image} 
-              alt={prop.title}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out" 
-              referrerPolicy="no-referrer"
-            />
+          <div className="relative aspect-[16/9] w-full overflow-hidden bg-theme-bg flex-shrink-0">
+            {prop.image ? (
+              <LazyImage 
+                src={prop.image} 
+                alt={prop.title}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out" 
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="w-full h-full bg-zinc-100 dark:bg-zinc-800 flex flex-col items-center justify-center text-zinc-400">
+                <CameraOff className="w-8 h-8 mb-1.5" />
+                <span className="text-[9px] font-bold uppercase tracking-wider">No photos available</span>
+              </div>
+            )}
             <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/10 opacity-60 group-hover:opacity-75 transition-opacity duration-300 pointer-events-none" />
             
             <div className="absolute top-3 right-3 flex items-center gap-1.5 z-10">

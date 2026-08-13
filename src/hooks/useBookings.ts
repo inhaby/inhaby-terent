@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@inhaby/shared';
+import { supabase, getThumbnailUrl } from '@inhaby/shared';
 import { useAuth } from '../context/TenantAuthContext';
 import { ActiveTenancy, PendingBooking, PastBooking } from '../types';
 
@@ -41,7 +41,7 @@ export function useBookings() {
             name: prop.owner?.name || "Owner",
             phone: prop.owner?.phone || "+91 90000 00000",
             email: prop.owner?.email || "owner@inhaby.com",
-            image: prop.owner?.avatar_url || "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=200"
+            image: prop.owner?.avatar_url || null
           },
           bills: [
             { id: 'b1', name: 'Monthly Rent', amount: Number(primary.rent_amount), dueDate: '05 Jun, 2026', status: 'Pending' },
@@ -56,39 +56,49 @@ export function useBookings() {
       // 2. Fetch pending bookings
       const { data: pendingData } = await supabase
         .from('bookings')
-        .select('*, property:properties(*)')
+        .select('*, property:properties(*, property_media(*))')
         .eq('tenant_id', user.id)
         .eq('status', 'pending');
 
       if (pendingData) {
-        setPendingBookings(pendingData.map(b => ({
-          id: b.id,
-          title: b.property?.title || 'Unknown Property',
-          location: b.property?.city || 'Bengaluru',
-          price: Number(b.rent_amount),
-          status: 'Awaiting Host Review',
-          appliedOn: new Date(b.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
-          image: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&q=80&w=500'
-        })));
+        setPendingBookings(pendingData.map(b => {
+          const media = b.property?.property_media || [];
+          const coverMedia = media.find((m: any) => m.is_cover) || media[0];
+          const coverUrl = coverMedia?.public_url ? getThumbnailUrl(coverMedia.public_url) : null;
+          return {
+            id: b.id,
+            title: b.property?.title || 'Unknown Property',
+            location: b.property?.city || 'Bengaluru',
+            price: Number(b.rent_amount),
+            status: 'Awaiting Host Review',
+            appliedOn: new Date(b.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+            image: coverUrl
+          };
+        }));
       }
 
       // 3. Fetch past bookings
       const { data: pastData } = await supabase
         .from('bookings')
-        .select('*, property:properties(*)')
+        .select('*, property:properties(*, property_media(*))')
         .eq('tenant_id', user.id)
         .in('status', ['completed', 'cancelled']);
 
       if (pastData) {
-        setPastBookings(pastData.map(b => ({
-          id: b.id,
-          title: b.property?.title || 'Unknown Property',
-          location: b.property?.city || 'Bengaluru',
-          price: Number(b.rent_amount),
-          duration: 'Closed',
-          status: b.status === 'completed' ? 'Closed Successfully' : 'Cancelled',
-          image: 'https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&q=80&w=500'
-        })));
+        setPastBookings(pastData.map(b => {
+          const media = b.property?.property_media || [];
+          const coverMedia = media.find((m: any) => m.is_cover) || media[0];
+          const coverUrl = coverMedia?.public_url ? getThumbnailUrl(coverMedia.public_url) : null;
+          return {
+            id: b.id,
+            title: b.property?.title || 'Unknown Property',
+            location: b.property?.city || 'Bengaluru',
+            price: Number(b.rent_amount),
+            duration: 'Closed',
+            status: b.status === 'completed' ? 'Closed Successfully' : 'Cancelled',
+            image: coverUrl
+          };
+        }));
       }
 
     } catch (err) {

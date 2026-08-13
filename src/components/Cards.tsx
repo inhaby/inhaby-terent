@@ -1,16 +1,24 @@
 import React from 'react';
-import { Heart, Share2, Star, Map as MapIcon } from 'lucide-react';
+import { Heart, Share2, Star, Map as MapIcon, CameraOff } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Property } from '../types';
 import { LazyImage } from './LazyImage';
+
+/** Neutral placeholder shown when a property has no uploaded photos */
+const NoPhotoPlaceholder = ({ className = '' }: { className?: string }) => (
+  <div className={`w-full h-full bg-zinc-100 flex flex-col items-center justify-center text-zinc-400 ${className}`}>
+    <CameraOff className="w-6 h-6 mb-1" />
+    <span className="text-[9px] font-bold uppercase tracking-wider">No photos</span>
+  </div>
+);
 
 export const LargeCard = React.memo(({ property, isSaved, onToggleSave, onClick, onShare }: { property: Property, isSaved: boolean, onToggleSave: (id: string) => void, onClick: (id: string) => void, onShare: (p: Property) => void, key?: any }) => (
   <div 
     onClick={() => onClick(property.id)}
     className="bg-white rounded-3xl overflow-hidden shadow-xl border border-gray-100 relative active:scale-[0.98] transition-transform cursor-pointer mb-6 animate-in fade-in duration-300"
   >
-    <div className="relative aspect-[16/10]">
-      <LazyImage src={property.image} alt={property.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+    <div className="relative aspect-[16/9] w-full overflow-hidden">
+      {property.image ? <LazyImage src={property.image} alt={property.title} className="w-full h-full object-cover block" referrerPolicy="no-referrer" /> : <NoPhotoPlaceholder />}
       <div className="absolute top-4 right-4 flex flex-col gap-2">
         <button 
           onClick={(e) => { e.stopPropagation(); onToggleSave(property.id); }}
@@ -54,7 +62,7 @@ export const MiniCard = React.memo(({ property, isSaved, onToggleSave, onClick, 
     className="bg-white rounded-2xl p-2 border border-gray-100 flex items-center gap-3 active:scale-[0.98] transition-transform cursor-pointer hover:border-theme-accent/20"
   >
     <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0">
-      <LazyImage src={property.image} alt={property.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+      {property.image ? <LazyImage src={property.image} alt={property.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : <NoPhotoPlaceholder />}
     </div>
     <div className="flex-1 min-w-0">
       <h4 className="font-bold text-gray-900 text-[11px] truncate">{property.title}</h4>
@@ -68,9 +76,9 @@ MiniCard.displayName = 'MiniCard';
 export const ImageFeedCard = React.memo(({ property, isSaved, onToggleSave, onClick, onShare }: { property: Property, isSaved: boolean, onToggleSave: (id: string) => void, onClick: (id: string) => void, onShare: (p: Property) => void, key?: any }) => (
   <div 
     onClick={() => onClick(property.id)}
-    className="relative aspect-[3/4] rounded-3xl overflow-hidden group cursor-pointer shadow-md"
+    className="relative aspect-[16/9] w-full rounded-3xl overflow-hidden group cursor-pointer shadow-md"
   >
-    <LazyImage src={property.image} alt={property.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" referrerPolicy="no-referrer" />
+    {property.image ? <LazyImage src={property.image} alt={property.title} className="w-full h-full object-cover block transition-transform duration-700 group-hover:scale-110" referrerPolicy="no-referrer" /> : <NoPhotoPlaceholder />}
     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
     <div className="absolute top-3 right-3">
       <button 
@@ -99,8 +107,8 @@ export const ComparisonCard = React.memo(({ property, onClick }: { property: Pro
     onClick={() => onClick(property.id)}
     className="bg-white rounded-2xl border border-gray-100 p-4 min-w-[200px] shadow-sm hover:shadow-md cursor-pointer transition-shadow"
   >
-    <div className="w-full h-24 rounded-xl overflow-hidden mb-3">
-      <LazyImage src={property.image} alt={property.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+    <div className="w-full aspect-[16/9] rounded-xl overflow-hidden mb-3">
+      {property.image ? <LazyImage src={property.image} alt={property.title} className="w-full h-full object-cover block" referrerPolicy="no-referrer" /> : <NoPhotoPlaceholder />}
     </div>
     <h4 className="font-bold text-gray-900 text-xs truncate mb-2">{property.title}</h4>
     <div className="space-y-2">
@@ -128,8 +136,8 @@ export const StackCard = React.memo(({ property, index, onClick }: { property: P
     whileHover={{ y: -20, transition: { duration: 0.2 } }}
     className="bg-white rounded-3xl overflow-hidden shadow-xl border border-gray-100 relative cursor-pointer"
   >
-    <div className="w-full h-48 overflow-hidden">
-      <LazyImage src={property.image} alt={property.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+    <div className="w-full aspect-[16/9] overflow-hidden">
+      {property.image ? <LazyImage src={property.image} alt={property.title} className="w-full h-full object-cover block" referrerPolicy="no-referrer" /> : <NoPhotoPlaceholder />}
     </div>
     <div className="p-4 bg-white">
       <h4 className="font-black text-gray-900 text-sm truncate">{property.title}</h4>
@@ -148,7 +156,7 @@ export const StoryCard = React.memo(({ property, onClick }: { property: Property
     className="flex flex-col items-center gap-2 cursor-pointer flex-shrink-0"
   >
     <div className="w-20 h-20 rounded-full p-1 border-2 border-theme-accent overflow-hidden">
-      <LazyImage src={property.image} alt={property.title} className="w-full h-full rounded-full object-cover animate-in fade-in decoration-300" referrerPolicy="no-referrer" />
+      {property.image ? <LazyImage src={property.image} alt={property.title} className="w-full h-full rounded-full object-cover animate-in fade-in decoration-300" referrerPolicy="no-referrer" /> : <NoPhotoPlaceholder className="rounded-full" />}
     </div>
     <span className="text-[10px] font-bold text-theme-text-secondary w-20 truncate text-center">{property.title.split(' ')[0]}</span>
   </div>
@@ -160,8 +168,8 @@ export const GridCard = React.memo(({ property, isSaved, onToggleSave, onClick, 
     onClick={() => onClick(property.id)}
     className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 relative active:scale-[0.98] transition-all cursor-pointer hover:shadow-md hover:border-theme-accent/10 duration-200"
   >
-    <div className="relative aspect-square mb-1">
-      <LazyImage src={property.image} alt={property.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+    <div className="relative aspect-[16/9] w-full overflow-hidden mb-1">
+      {property.image ? <LazyImage src={property.image} alt={property.title} className="w-full h-full object-cover block" referrerPolicy="no-referrer" /> : <NoPhotoPlaceholder />}
       {property.tag && (
         <span className="absolute top-2 left-2 bg-red-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded uppercase leading-none">
           {property.tag}
@@ -197,7 +205,7 @@ export const ListCard = React.memo(({ property, isSaved, onToggleSave, onClick, 
     className="bg-theme-surface rounded-2xl overflow-hidden shadow-sm border border-theme-border/60 flex gap-3 p-2 active:scale-[0.98] transition-all duration-300 cursor-pointer hover:border-theme-accent/25"
   >
     <div className="relative w-24 h-24 flex-shrink-0">
-      <LazyImage src={property.image} alt={property.title} className="w-full h-full rounded-xl object-cover" referrerPolicy="no-referrer" />
+      {property.image ? <LazyImage src={property.image} alt={property.title} className="w-full h-full rounded-xl object-cover" referrerPolicy="no-referrer" /> : <NoPhotoPlaceholder className="rounded-xl" />}
       {property.tag && (
         <span className="absolute top-1.5 left-1.5 bg-theme-accent text-white text-[7px] font-black px-2 py-0.5 rounded uppercase tracking-wider">
           {property.tag}
@@ -233,8 +241,8 @@ export const CarouselCard = React.memo(({ property, isSaved, onToggleSave, onCli
     onClick={() => onClick(property.id)}
     className="w-64 flex-shrink-0 bg-theme-surface rounded-2xl overflow-hidden shadow-sm border border-theme-border/60 relative active:scale-[0.98] transition-all duration-300 cursor-pointer animate-in fade-in hover:border-theme-accent/25"
   >
-    <div className="relative aspect-[16/10]">
-      <LazyImage src={property.image} alt={property.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+    <div className="relative aspect-[16/9] w-full overflow-hidden">
+      {property.image ? <LazyImage src={property.image} alt={property.title} className="w-full h-full object-cover block" referrerPolicy="no-referrer" /> : <NoPhotoPlaceholder />}
       <div className="absolute top-2 right-2 flex gap-2">
         <button 
           onClick={(e) => { e.stopPropagation(); onShare(property); }}

@@ -110,46 +110,51 @@ const ViewAll = ({
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -20 }}
-      className="fixed inset-0 z-[60] bg-theme-bg overflow-y-auto no-scrollbar max-w-md md:max-w-none mx-auto transition-colors duration-300 text-left"
+      className="fixed inset-0 z-[60] bg-theme-bg overflow-y-auto no-scrollbar transition-colors duration-300 text-left"
     >
-      <div className="sticky top-0 z-50 bg-theme-surface/95 backdrop-blur-md px-4 py-4 flex items-center gap-4 border-b border-theme-border transition-colors duration-300">
-        <button onClick={onBack} className="p-2 bg-theme-bg hover:bg-theme-border/40 rounded-full text-theme-text-primary active:scale-90 transition-all cursor-pointer">
-          <ChevronLeft size={24} />
-        </button>
-        <h1 className="text-xl font-black text-theme-text-primary">{title}</h1>
-      </div>
-
-      <div className="p-4 grid grid-cols-1 gap-4">
-        {items.map((property, i) => (
-          <VirtualItem key={property.id}>
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.05 }}
-            >
-              <CustomPropertyCard 
-                property={property} 
-                isSaved={savedIds.includes(property.id)}
-                onToggleSave={onToggleSave}
-                onClick={onSelectProperty}
-                onShare={onShare}
-              />
-            </motion.div>
-          </VirtualItem>
-        ))}
-      </div>
-
-      {page < totalPages && (
-        <div className="p-4">
-          <button 
-            onClick={() => setPage(p => p + 1)}
-            disabled={loading}
-            className="w-full py-4 bg-theme-surface border border-theme-border rounded-2xl text-theme-accent font-bold text-sm uppercase tracking-widest shadow-sm cursor-pointer hover:bg-theme-bg transition-colors"
-          >
-            {loading ? 'Loading...' : 'Load More'}
+      <div className="sticky top-0 z-50 bg-theme-surface/95 backdrop-blur-md border-b border-theme-border transition-colors duration-300">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 flex items-center gap-4">
+          <button onClick={onBack} className="p-2 bg-theme-bg hover:bg-theme-border/40 rounded-full text-theme-text-primary active:scale-90 transition-all cursor-pointer">
+            <ChevronLeft size={24} />
           </button>
+          <h1 className="text-xl font-black text-theme-text-primary">{title}</h1>
         </div>
-      )}
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 space-y-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+          {items.map((property, i) => (
+            <VirtualItem key={property.id} height="360px">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.05 }}
+                className="h-full"
+              >
+                <CustomPropertyCard 
+                  property={property} 
+                  isSaved={savedIds.includes(property.id)}
+                  onToggleSave={onToggleSave}
+                  onClick={onSelectProperty}
+                  onShare={onShare}
+                />
+              </motion.div>
+            </VirtualItem>
+          ))}
+        </div>
+
+        {page < totalPages && (
+          <div className="pt-4 max-w-md mx-auto">
+            <button 
+              onClick={() => setPage(p => p + 1)}
+              disabled={loading}
+              className="w-full py-4 bg-theme-surface border border-theme-border rounded-2xl text-theme-accent font-bold text-sm uppercase tracking-widest shadow-sm cursor-pointer hover:bg-theme-bg transition-colors"
+            >
+              {loading ? 'Loading...' : 'Load More'}
+            </button>
+          </div>
+        )}
+      </div>
     </motion.div>
   );
 };

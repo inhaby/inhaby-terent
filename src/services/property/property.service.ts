@@ -1,4 +1,4 @@
-import { supabase } from '@inhaby/shared';
+import { supabase, getThumbnailUrl, getGalleryUrl } from '@inhaby/shared';
 import { Property, Section } from '../../types';
 
 export function mapSupabasePropertyToModel(dbProp: any): Property {
@@ -7,11 +7,11 @@ export function mapSupabasePropertyToModel(dbProp: any): Property {
   // Sort by sort_order
   const sortedMediaList = [...mediaList].sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0));
 
-  const coverImage = sortedMediaList.find((img: any) => img.is_cover || img.is_cover === true)?.public_url || 
-                     sortedMediaList.find((img: any) => img.is_cover || img.is_cover === true)?.url || 
-                     sortedMediaList[0]?.public_url || 
-                     sortedMediaList[0]?.url || 
-                     'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&q=80&w=400';
+  const rawCoverUrl = sortedMediaList.find((img: any) => img.is_cover || img.is_cover === true)?.public_url || 
+                      sortedMediaList.find((img: any) => img.is_cover || img.is_cover === true)?.url || 
+                      sortedMediaList[0]?.public_url || 
+                      sortedMediaList[0]?.url;
+  const coverImage = rawCoverUrl ? getThumbnailUrl(rawCoverUrl) : null;
   
   // Use slug if available, fall back to id so navigation never silently fails
   const slug = dbProp.slug || dbProp.id;
@@ -42,8 +42,8 @@ export function mapSupabasePropertyToModel(dbProp: any): Property {
     slug,
     title: dbProp.title,
     image: coverImage,
-    images: mappedMedia.map(m => m.url),
-    mediaItems: mappedMedia, // Attach full metadata items list
+    images: mappedMedia.map(m => getGalleryUrl(m.url)),
+    mediaItems: mappedMedia.map(m => ({ ...m, url: getGalleryUrl(m.url) })), // Attach transformed gallery url
     tag: dbProp.is_featured ? 'PREMIUM' : undefined,
     details: `${dbProp.bedrooms} BHK • ${dbProp.bathrooms} Bath • ${dbProp.area_sqft || 0} sq. ft.`,
     description: dbProp.description || '',
@@ -154,6 +154,7 @@ export const propertyService = {
         .from('properties')
         .select(`
           *,
+          property_media(*),
           images: property_images(*),
           amenities: amenities(*),
           owner: owner_profiles(*)
@@ -207,6 +208,7 @@ export const propertyService = {
         .from('properties')
         .select(`
           *,
+          property_media(*),
           images: property_images(*),
           amenities: amenities(*),
           owner: owner_profiles(*)

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Heart, Star, Share2, MapPin } from 'lucide-react';
+import { Heart, Star, Share2, MapPin, CameraOff } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Property } from '../types';
 import { LazyImage } from './LazyImage';
@@ -33,13 +33,20 @@ export const CustomPropertyCard: React.FC<CustomPropertyCardProps> = React.memo(
       )}
 
       {/* Image Container with premium scaling & hover */}
-      <div className="relative aspect-[4/3] overflow-hidden bg-theme-bg flex-shrink-0">
-        <LazyImage
-          src={property.image}
-          alt={property.title}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
-          referrerPolicy="no-referrer"
-        />
+      <div className="relative aspect-[16/9] w-full overflow-hidden bg-theme-bg flex-shrink-0">
+        {property.image ? (
+          <LazyImage
+            src={property.image}
+            alt={property.title}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <div className="w-full h-full bg-zinc-100 flex flex-col items-center justify-center text-zinc-400">
+            <CameraOff className="w-8 h-8 mb-1.5" />
+            <span className="text-[10px] font-bold uppercase tracking-wider">No photos</span>
+          </div>
+        )}
         
         {/* Soft immersive dark gradients on image lower edge */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/10 opacity-70 group-hover:opacity-85 transition-opacity duration-300 pointer-events-none" />

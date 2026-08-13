@@ -84,6 +84,7 @@ export const searchService = {
       .from('properties')
       .select(`
         *,
+        property_media(*),
         images: property_images(*),
         amenities: amenities(*),
         owner: owner_profiles(*)

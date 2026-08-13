@@ -2,7 +2,7 @@ import React from 'react';
 import { Footprints, CalendarDays, MessageCircle, Phone, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
 import { VisitRequest, Property } from '../types';
 import { VirtualItem } from './VirtualItem';
-import { VisitNavigationDashboard } from '@inhaby/shared';
+import { VisitNavigationDashboard } from './googleMaps/VisitNavigationDashboard';
 
 
 interface MyVisitsSectionProps {
@@ -23,7 +23,8 @@ export const MyVisitsSection: React.FC<MyVisitsSectionProps> = ({
   onSelectPropertyId,
   onChatOwner,
   onSelectTab,
-  onStartBrowsing
+  onStartBrowsing,
+  setVisitRequests
 }) => {
   const [activeSubTab, setActiveSubTab] = React.useState<'pending' | 'approved' | 'rejected'>('pending');
   const [expandedVisitId, setExpandedVisitId] = React.useState<string | null>(null);
@@ -191,9 +192,9 @@ export const MyVisitsSection: React.FC<MyVisitsSectionProps> = ({
                                   doorNumber: 'Flat 304',
                                   entryInstructions: 'Show visitor gate pass at security guard post.'
                                 }
-                              }}
-                              propertyCoords={prop.coordinates || { lat: 12.9716, lng: 77.5946 }}
-                              exactAddress={prop.address || 'Address'}
+                              } as any}
+                              propertyCoords={{ lat: prop.latitude || 12.9716, lng: prop.longitude || 77.5946 }}
+                              exactAddress={prop.location || 'Address'}
                               isDark={false}
                               onStatusChange={(newStatus) => {
                                 setVisitRequests(prev => prev.map(v => v.id === req.id ? { ...v, status: newStatus as any } : v));

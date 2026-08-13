@@ -61,15 +61,7 @@ export const FullscreenGallery: React.FC<FullscreenGalleryProps> = ({
 
   // Clean media items fallback
   const items = useMemo(() => {
-    if (mediaItems && mediaItems.length > 0) return mediaItems;
-    return [{
-      id: "placeholder",
-      url: "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&q=80&w=800",
-      category: "Exterior",
-      version: 1,
-      edited: false,
-      is_cover: true
-    }];
+    return mediaItems || [];
   }, [mediaItems]);
 
   const activeItem = items[activeIndex] || items[0];
@@ -286,7 +278,7 @@ export const FullscreenGallery: React.FC<FullscreenGalleryProps> = ({
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || items.length === 0) return null;
 
   return (
     <AnimatePresence>
@@ -446,7 +438,7 @@ export const FullscreenGallery: React.FC<FullscreenGalleryProps> = ({
                     setPan({ x: 0, y: 0 });
                     setActiveIndex(idx);
                   }}
-                  className={`relative flex-shrink-0 w-16 h-12 rounded-lg overflow-hidden transition-all duration-200 border-2 cursor-pointer ${idx === activeIndex ? 'border-brand scale-105 opacity-100 shadow-md shadow-brand/20' : 'border-transparent opacity-50 hover:opacity-85'}`}
+                  className={`relative flex-shrink-0 w-16 aspect-[16/9] rounded-lg overflow-hidden transition-all duration-200 border-2 cursor-pointer ${idx === activeIndex ? 'border-brand scale-105 opacity-100 shadow-md shadow-brand/20' : 'border-transparent opacity-50 hover:opacity-85'}`}
                 >
                   <img src={item.url} alt="Thumbnail preview" className="w-full h-full object-cover" />
                   
