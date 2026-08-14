@@ -18,6 +18,8 @@
   --color-theme-accent-hover: var(--accent-hover);
   --color-theme-accent-soft: var(--accent-soft);
   --color-theme-accent-contrast: var(--accent-contrast);
+  --color-gallery-cell-bg: var(--gallery-cell-bg);
+  --color-gallery-cell-border: var(--gallery-cell-border);
 
   /* Landing Page Theme Colors */
   --color-background: var(--background);

@@ -1,19 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import EmojiPicker from 'emoji-picker-react';
 import { 
-  Search, Paperclip, Send, Image, Smile, Phone, Video, Info, 
+  Search, Paperclip, Send, Image as ImageIcon, Smile, Phone, Video, Info, 
   ChevronLeft, Check, CheckCheck, Circle, MessageSquare, 
-  Eye, Heart, ExternalLink, Calendar, MapPin, Trash2, Camera, MoreVertical, Sparkles,
+  Eye, Heart, ExternalLink, Calendar, MapPin, Trash2, Camera, MoreVertical, Sparkles, X,
   Home, Footprints, User, Pin, VolumeX, Shield, Slash, VideoOff, Mic, MicOff, Volume2, Star, ShieldCheck, CheckCircle2, Bookmark, SlidersHorizontal, CircleDot, Zap
 } from 'lucide-react';
 import { Property } from '../types';
 import { useAuth } from '../context/TenantAuthContext';
-import { supabase } from '@inhaby/shared';
+import { supabase, getOrCreateConversation, sendContextualMessage, uploadChatMediaToCloudinary, getAvatarUrl } from '@inhaby/shared';
 
 export interface ChatMessage {
   id: string;
   senderId: 'tenant' | 'owner';
   text?: string;
+  messageType?: string;
+  payload?: any;
   imageUrl?: string;
   timestamp: string; // ISO String
   status: 'sending' | 'sent' | 'delivered' | 'read';
@@ -21,6 +24,7 @@ export interface ChatMessage {
 
 export interface Conversation {
   id: string;
+  otherUserId: string;
   ownerName: string;
   ownerPhoto: string;
   ownerPhone: string;
@@ -57,13 +61,6 @@ interface MessagesSectionProps {
   setAccent?: (accent: string) => void;
 }
 
-// Predefined room mock images for simulated attachment upload
-const MOCK_ATTACHMENT_IMAGES = [
-  'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&q=80&w=400',
-  'https://images.unsplash.com/photo-1598928506311-c55ded91a20c?auto=format&fit=crop&q=80&w=400',
-  'https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&q=80&w=400',
-];
-
 const getOwnerMetadata = (name: string) => {
   const norm = name.toLowerCase();
   if (norm.includes('arpit')) {
@@ -97,17 +94,6 @@ const getOwnerMetadata = (name: string) => {
       responseRate: '95%',
       responseTime: '< 1 hour',
       completedVisits: 29,
-      verifiedListings: '100%',
-    };
-  } else if (norm.includes('rm')) {
-    return {
-      level: 'Elite Owner',
-      joined: 'Joined September 2020',
-      listed: 8,
-      active: 6,
-      responseRate: '98%',
-      responseTime: '< 10 mins',
-      completedVisits: 84,
       verifiedListings: '100%',
     };
   } else {
@@ -152,9 +138,16 @@ export const MessagesSection: React.FC<MessagesSectionProps> = ({
   
   // Input fields for current chat
   const [inputText, setInputText] = useState('');
-  const [selectedAttachmentImage, setSelectedAttachmentImage] = useState<string | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [showAttachMenu, setShowAttachMenu] = useState(false);
+  
+  // Multi-image selection & preview composer state
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [activeMsgMenuId, setActiveMsgMenuId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const chatBodyRef = useRef<HTMLDivElement>(null);
 
@@ -217,7 +210,7 @@ export const MessagesSection: React.FC<MessagesSectionProps> = ({
     return () => clearInterval(timer);
   }, [activeCall?.status]);
 
-  // Load conversations from Supabase
+  // Load 1-to-1 conversations from Supabase (Strict One User ↔ One User grouping)
   const loadConversations = async (currentUserId: string, selectNewId?: string) => {
     try {
       const { data: dbConvs, error: convError } = await supabase
@@ -253,6 +246,8 @@ export const MessagesSection: React.FC<MessagesSectionProps> = ({
             id,
             sender_id,
             text,
+            message_type,
+            payload,
             created_at
           )
         `)
@@ -261,38 +256,86 @@ export const MessagesSection: React.FC<MessagesSectionProps> = ({
       if (convError) throw convError;
       if (!dbConvs) return;
 
-      const mappedConvs: Conversation[] = dbConvs.map((c: any) => {
-        const sortedMsgs = (c.messages || []).sort((a: any, b: any) => 
-          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-        );
-        const lastMsg = sortedMsgs[sortedMsgs.length - 1];
-        const lastTime = lastMsg ? lastMsg.created_at : c.created_at;
+      // Group DB rows by participant pair (otherUserId)
+      const userGroupMap = new Map<string, {
+        canonicalId: string;
+        otherUserId: string;
+        ownerName: string;
+        ownerPhoto: string;
+        ownerPhone: string;
+        ownerEmail: string;
+        property: any;
+        rawMessages: any[];
+        latestTime: string;
+      }>();
+
+      dbConvs.forEach((c: any) => {
+        const otherUserId = c.tenant_id === currentUserId ? c.owner_id : c.tenant_id;
+        const key = otherUserId || c.id;
+
+        const convMsgs = c.messages || [];
+        const existing = userGroupMap.get(key);
 
         const images = c.property?.property_images || [];
         const coverImage = images.find((i: any) => i.is_cover)?.url || images[0]?.url || 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&q=80&w=400';
+        const propObj = {
+          id: c.property?.id || c.property_id || '',
+          title: c.property?.title || 'Property Enquiry',
+          type: `${c.property?.bedrooms || 1} BHK • ${c.property?.locality || 'Noida'}`,
+          price: Number(c.property?.rent || 0),
+          image: coverImage
+        };
 
-        const isSelected = selectedConvId === c.id || selectNewId === c.id;
+        const ownerName = c.owner?.name || 'Inhaby Host';
+        const ownerPhoto = getAvatarUrl(c.owner?.avatar_url, ownerName);
+
+        if (!existing) {
+          userGroupMap.set(key, {
+            canonicalId: c.id,
+            otherUserId: key,
+            ownerName,
+            ownerPhoto,
+            ownerPhone: c.owner?.phone || '+91 99999 99999',
+            ownerEmail: `${ownerName.toLowerCase().replace(/\s+/g, '')}@inhaby.com`,
+            property: propObj,
+            rawMessages: [...convMsgs],
+            latestTime: c.created_at
+          });
+        } else {
+          existing.rawMessages.push(...convMsgs);
+          if (new Date(c.created_at).getTime() > new Date(existing.latestTime).getTime()) {
+            existing.latestTime = c.created_at;
+            if (c.property) existing.property = propObj;
+          }
+        }
+      });
+
+      const mappedConvs: Conversation[] = Array.from(userGroupMap.values()).map((g) => {
+        const sortedMsgs = g.rawMessages.sort((a: any, b: any) => 
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+        const lastMsg = sortedMsgs[sortedMsgs.length - 1];
+        const lastTime = lastMsg ? lastMsg.created_at : g.latestTime;
+
+        const isSelected = selectedConvId === g.canonicalId || selectNewId === g.canonicalId;
         const unreadCount = (!isSelected && lastMsg && lastMsg.sender_id !== currentUserId) ? 1 : 0;
 
         return {
-          id: c.id,
-          ownerName: c.owner?.name || 'Owner',
-          ownerPhoto: c.owner?.avatar_url || 'https://i.pravatar.cc/150',
-          ownerPhone: c.owner?.phone || '+91 99999 99999',
-          ownerEmail: `${(c.owner?.name || 'owner').toLowerCase().replace(/\s+/g, '')}@inhaby.com`,
+          id: g.canonicalId,
+          otherUserId: g.otherUserId,
+          ownerName: g.ownerName,
+          ownerPhoto: g.ownerPhoto,
+          ownerPhone: g.ownerPhone,
+          ownerEmail: g.ownerEmail,
           isOnline: true,
           onlineStatusText: 'Active now',
-          property: {
-            id: c.property?.id || c.property_id || '',
-            title: c.property?.title || 'Unknown Property',
-            type: `${c.property?.bedrooms || 1} BHK • ${c.property?.locality || 'Noida'}`,
-            price: Number(c.property?.rent || 0),
-            image: coverImage
-          },
+          property: g.property,
           messages: sortedMsgs.map((m: any) => ({
             id: m.id,
             senderId: m.sender_id === currentUserId ? 'tenant' : 'owner',
             text: m.text,
+            messageType: m.message_type || 'text',
+            payload: m.payload || {},
             timestamp: m.created_at,
             status: 'read' as const
           })),
@@ -318,25 +361,24 @@ export const MessagesSection: React.FC<MessagesSectionProps> = ({
       loadConversations(user.id);
     }, 5000);
 
-    // Seed notes row matching styling requirements (EXCLUDING self 'Your note' story bubble/avatar)
     setNotesList([
       {
         id: 'note-1',
         name: 'Arpit Saxena',
-        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150',
+        avatar: getAvatarUrl('', 'Arpit Saxena'),
         note: 'Looking for flatmates!',
         song: 'Mat Maari - Pritam, Kunal'
       },
       {
         id: 'note-2',
         name: 'nao',
-        avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=150',
+        avatar: getAvatarUrl('', 'nao'),
         note: 'Study hard ⛩️'
       },
       {
         id: 'note-3',
         name: 'Veerr',
-        avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=150',
+        avatar: getAvatarUrl('', 'Veerr'),
         note: 'Weekend vibes 🍻'
       }
     ]);
@@ -344,7 +386,7 @@ export const MessagesSection: React.FC<MessagesSectionProps> = ({
     return () => clearInterval(interval);
   }, [user]);
 
-  // Handle outside activation
+  // Handle outside activation (Fixes duplicate message bug by checking before insertion)
   useEffect(() => {
     if (!user || !openConversationWithPropertyId || propertiesList.length === 0) return;
 
@@ -352,43 +394,42 @@ export const MessagesSection: React.FC<MessagesSectionProps> = ({
       const matchProp = propertiesList.find(p => p.id === openConversationWithPropertyId);
       if (!matchProp) return;
 
-      // Check if conversation already exists in database
+      const targetHostId = matchProp.ownerId || 'd79b25ee-5b8d-4a1e-8fd9-d5966a3d666d';
+
       try {
-        const { data: existing, error } = await supabase
-          .from('conversations')
-          .select('id')
-          .eq('property_id', matchProp.id)
-          .eq('tenant_id', user.id)
-          .maybeSingle();
+        // 1. Get or create the 1-to-1 conversation between current user and target host
+        const convId = await getOrCreateConversation(user.id, targetHostId);
 
-        if (existing) {
-          setSelectedConvId(existing.id);
-        } else {
-          // Create new conversation in Supabase
-          const { data: newConv, error: insertError } = await supabase
-            .from('conversations')
-            .insert({
+        // 2. Check if a property_context message for this exact property already exists in thread
+        const { data: existingMsgs } = await supabase
+          .from('messages')
+          .select('id, payload')
+          .eq('conversation_id', convId)
+          .eq('sender_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(5);
+
+        const alreadySent = (existingMsgs || []).some((m: any) => m.payload?.property_id === matchProp.id);
+
+        if (!alreadySent) {
+          // Insert property interest context message ONCE
+          await sendContextualMessage({
+            conversationId: convId,
+            senderId: user.id,
+            text: `Hi! I am interested in "${matchProp.title}".`,
+            messageType: 'property_context',
+            payload: {
               property_id: matchProp.id,
-              tenant_id: user.id,
-              owner_id: matchProp.ownerId || 'd79b25ee-5b8d-4a1e-8fd9-d5966a3d666d'
-            })
-            .select()
-            .single();
-
-          if (insertError) throw insertError;
-          if (newConv) {
-            // Also insert initial message from tenant
-            await supabase
-              .from('messages')
-              .insert({
-                conversation_id: newConv.id,
-                sender_id: user.id,
-                text: `Hi, I am interested in your property "${matchProp.title}". Is it available?`
-              });
-
-            await loadConversations(user.id, newConv.id);
-          }
+              title: matchProp.title,
+              price: matchProp.price,
+              image: matchProp.image,
+              location: matchProp.location
+            }
+          });
         }
+
+        // 3. Reload conversations and select the 1-to-1 thread
+        await loadConversations(user.id, convId);
       } catch (err) {
         console.error('Error opening conversation from outside:', err);
       } finally {
@@ -417,33 +458,95 @@ export const MessagesSection: React.FC<MessagesSectionProps> = ({
     }
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    const validFiles = files.filter(f => ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'].includes(f.type.toLowerCase()));
+    if (validFiles.length === 0) {
+      setToastMessage("Supported formats: JPG, JPEG, PNG, WEBP.");
+      return;
+    }
+
+    const combined = [...selectedFiles, ...validFiles];
+    if (combined.length > 10) {
+      setToastMessage("Maximum 10 images can be attached at once.");
+      return;
+    }
+
+    setSelectedFiles(combined);
+    setPreviewUrls(combined.map(f => URL.createObjectURL(f)));
+  };
+
+  const handleRemovePreview = (index: number) => {
+    const newFiles = selectedFiles.filter((_, i) => i !== index);
+    setSelectedFiles(newFiles);
+    setPreviewUrls(newFiles.map(f => URL.createObjectURL(f)));
+  };
+
   const handleSendMessage = async () => {
-    if (!inputText.trim() && !selectedAttachmentImage) return;
+    if (!inputText.trim() && selectedFiles.length === 0) return;
     if (!selectedConvId || !user) return;
 
-    const textToSend = inputText.trim() || (selectedAttachmentImage ? `[Attachment]: ${selectedAttachmentImage}` : '');
-    
+    const textToSend = inputText.trim();
     setInputText('');
-    setSelectedAttachmentImage(null);
     setShowEmojiPicker(false);
-    setShowAttachMenu(false);
 
     try {
-      const { data: newMsg, error } = await supabase
-        .from('messages')
-        .insert({
-          conversation_id: selectedConvId,
-          sender_id: user.id,
-          text: textToSend
-        })
-        .select()
-        .single();
+      if (selectedFiles.length > 0) {
+        setUploadingMedia(true);
+        const uploaded = await Promise.all(
+          selectedFiles.map(file => uploadChatMediaToCloudinary(file, selectedConvId))
+        );
 
-      if (error) throw error;
+        const mediaPayload = uploaded.map((u, i) => ({
+          secure_url: u.secure_url,
+          public_id: u.public_id,
+          sort_order: i
+        }));
+
+        await sendContextualMessage({
+          conversationId: selectedConvId,
+          senderId: user.id,
+          text: textToSend,
+          messageType: 'image',
+          payload: { media: mediaPayload }
+        });
+
+        setSelectedFiles([]);
+        setPreviewUrls([]);
+      } else {
+        await sendContextualMessage({
+          conversationId: selectedConvId,
+          senderId: user.id,
+          text: textToSend,
+          messageType: 'text',
+          payload: {}
+        });
+      }
 
       await loadConversations(user.id);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error sending message:', err);
+      setToastMessage(err.message || 'Failed to send message');
+    } finally {
+      setUploadingMedia(false);
+    }
+  };
+
+  const handleDeleteMessage = async (msgId: string) => {
+    if (!user) return;
+    try {
+      await supabase
+        .from('messages')
+        .update({ text: 'This message was deleted', message_type: 'deleted' })
+        .eq('id', msgId)
+        .eq('sender_id', user.id);
+
+      await loadConversations(user.id);
+      setActiveMsgMenuId(null);
+    } catch (err) {
+      console.error('Error deleting message:', err);
     }
   };
 
@@ -471,14 +574,29 @@ export const MessagesSection: React.FC<MessagesSectionProps> = ({
     setShowDeleteModalId(id);
   };
 
-  const handleAddEmoji = (emoji: string) => {
-    setInputText(prev => prev + emoji);
-    setShowEmojiPicker(false);
+  const handleConfirmMute = (convId: string | null, type: 'All' | 'Chats Only' | 'Calls Only') => {
+    if (!convId) return;
+    setMutedChats(prev => ({ ...prev, [convId]: type }));
+    setShowMuteModalId(null);
   };
 
-  const handleSimulateImageUpload = (index: number) => {
-    setSelectedAttachmentImage(MOCK_ATTACHMENT_IMAGES[index]);
-    setShowAttachMenu(false);
+  const handleConfirmDelete = async (convId: string | null) => {
+    if (!convId || !user) return;
+    try {
+      await supabase.from('conversations').delete().eq('id', convId);
+      setConversations(prev => prev.filter(c => c.id !== convId));
+      if (selectedConvId === convId) {
+        setSelectedConvId(null);
+      }
+    } catch (err) {
+      console.error('Error deleting conversation:', err);
+    } finally {
+      setShowDeleteModalId(null);
+    }
+  };
+
+  const handleSimulateGrantPermissions = () => {
+    setActiveCall(prev => prev ? { ...prev, status: 'active' } : null);
   };
 
   // Filter conversations (excluding self chats and using pin & date for sorting)
@@ -595,42 +713,6 @@ export const MessagesSection: React.FC<MessagesSectionProps> = ({
           return prev;
         });
       }, 1500);
-    }
-  };
-
-  const handleSimulateGrantPermissions = () => {
-    setActiveCall(prev => prev ? {
-      ...prev,
-      status: 'active',
-      camStatus: 'Available',
-      micStatus: 'Available',
-      speakerStatus: 'Available'
-    } : null);
-  };
-
-  const handleConfirmMute = (id: string, option: 'All' | 'Chats Only' | 'Calls Only') => {
-    setMutedChats(prev => ({
-      ...prev,
-      [id]: option
-    }));
-    setShowMuteModalId(null);
-  };
-
-  const handleConfirmDelete = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from('conversations')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-      setConversations(prev => prev.filter(c => c.id !== id));
-      if (selectedConvId === id) {
-        setSelectedConvId(null);
-      }
-      setShowDeleteModalId(null);
-    } catch (err) {
-      console.error('Error deleting conversation:', err);
     }
   };
 
@@ -763,13 +845,15 @@ export const MessagesSection: React.FC<MessagesSectionProps> = ({
                       </div>
                     </div>
 
-                    <div className="text-[10px] font-bold text-theme-accent uppercase tracking-wider truncate">
-                      Regarding: {conv.property.title}
-                    </div>
-
                     <p className={`text-xs truncate ${conv.unreadCount > 0 ? 'text-theme-text-primary font-bold' : 'text-theme-text-secondary/75'}`}>
                       {lastMsg?.senderId === 'tenant' ? 'You: ' : ''}
-                      {lastMsg?.imageUrl ? 'Sent an attachment' : lastMsg?.text}
+                      {lastMsg?.messageType === 'property_context' ? `🏠 Property enquiry: ${lastMsg.payload?.title || conv.property.title}` :
+                       lastMsg?.messageType === 'visit_request' ? `📅 Visit requested` :
+                       lastMsg?.messageType === 'visit_accepted' ? `✓ Visit accepted` :
+                       lastMsg?.messageType === 'visit_rejected' ? `❌ Visit rejected` :
+                       lastMsg?.messageType === 'booking_request' ? `⚡ Booking requested` :
+                       lastMsg?.messageType === 'booking_accepted' ? `✓ Booking accepted` :
+                       (lastMsg?.imageUrl ? 'Sent an attachment' : (lastMsg?.text || 'Started a conversation'))}
                     </p>
                   </div>
 
@@ -1080,43 +1164,54 @@ export const MessagesSection: React.FC<MessagesSectionProps> = ({
               </div>
             ) : (
               /* --- CONVENTIONAL CHAT LAYOUT --- */
-              <>
+              <div className="flex-1 flex flex-col min-h-0 relative">
                 {/* QUICK COMPACT PROPERTY CONTEXT ANCHOR (TOP OF CHAT) */}
                 <div className="px-5 py-2.5 bg-theme-bg/40 border-b border-theme-border/30 flex items-center justify-between gap-3 shrink-0 flex-row">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-9 h-9 rounded-lg overflow-hidden shrink-0 border border-theme-border/60">
-                  <img src={currentChat.property.image} alt={currentChat.property.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-9 h-9 rounded-lg overflow-hidden shrink-0 border border-theme-border/60">
+                      <img src={currentChat.property.image} alt={currentChat.property.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    </div>
+                    <div className="min-w-0 font-sans">
+                      <p className="text-[11px] font-black text-theme-text-primary truncate">{currentChat.property.title}</p>
+                      <p className="text-[9px] text-theme-text-secondary font-bold truncate tracking-tight">{currentChat.property.type} • ₹{currentChat.property.price.toLocaleString('en-IN')}/mo</p>
+                    </div>
+                  </div>
+                  {onSelectProperty && (
+                    <button 
+                      onClick={() => onSelectProperty(currentChat.property.id)}
+                      className="bg-theme-accent hover:bg-theme-accent-hover text-white px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-1 active:scale-95 transition-all text-sans shrink-0 cursor-pointer"
+                    >
+                      <span>View Property</span>
+                      <ExternalLink size={10} />
+                    </button>
+                  )}
                 </div>
-                <div className="min-w-0 font-sans">
-                  <p className="text-[11px] font-black text-theme-text-primary truncate">{currentChat.property.title}</p>
-                  <p className="text-[9px] text-theme-text-secondary font-bold truncate tracking-tight">{currentChat.property.type} • ₹{currentChat.property.price.toLocaleString('en-IN')}/mo</p>
-                </div>
-              </div>
-              {onSelectProperty && (
-                <button 
-                  onClick={() => onSelectProperty(currentChat.property.id)}
-                  className="bg-theme-accent hover:bg-theme-accent-hover text-white px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-1 active:scale-95 transition-all text-sans shrink-0 cursor-pointer"
-                >
-                  <span>View Property</span>
-                  <ExternalLink size={10} />
-                </button>
-              )}
-            </div>
 
-            {/* CHAT BUBBLES CONTAINER BODY */}
-            <div 
-              ref={chatBodyRef}
-              className="flex-1 overflow-y-auto px-5 py-6 bg-theme-bg/15 space-y-4"
-            >
-              {/* Visual guidelines */}
-              <div className="max-w-md mx-auto text-center space-y-2 pb-6 select-none">
-                <span className="inline-block px-3 py-1 bg-theme-bg/60 border border-theme-border rounded-full text-[9px] text-theme-text-secondary font-bold uppercase tracking-[0.15em]">
-                  🛡️ Homstay Verified Connection
-                </span>
-                <p className="text-[10px] text-theme-text-secondary/80 leading-relaxed font-bold">
-                  Zero brokerage, direct landlord dealing. Payments processed inside active leases reflect in your account profile automatically.
-                </p>
-              </div>
+                {/* Hidden file picker input */}
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={handleFileSelect} 
+                  multiple 
+                  accept="image/jpeg,image/jpg,image/png,image/webp" 
+                  className="hidden" 
+                />
+
+                {/* Toast alert banner */}
+                {toastMessage && (
+                  <div className="fixed top-6 left-1/2 -translate-x-1/2 bg-theme-surface border border-theme-accent text-theme-text-primary px-4 py-2.5 rounded-2xl shadow-2xl z-50 flex items-center gap-2 text-xs font-bold font-sans animate-bounce">
+                    <span>{toastMessage}</span>
+                    <button onClick={() => setToastMessage(null)} className="ml-2 p-0.5 hover:bg-theme-bg rounded-full">
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
+
+              {/* CHAT BUBBLES CONTAINER BODY */}
+              <div 
+                ref={chatBodyRef}
+                className="flex-1 overflow-y-auto px-5 py-6 bg-theme-bg/15 space-y-4"
+              >
 
               {/* Rendered group of messages with separators */}
               {Object.entries(groupMessagesByDate(currentChat.messages)).map(([date, msgs]) => (
@@ -1130,11 +1225,12 @@ export const MessagesSection: React.FC<MessagesSectionProps> = ({
 
                   {msgs.map((msg) => {
                     const isMe = msg.senderId === 'tenant';
+                    const isDeleted = msg.messageType === 'deleted';
                     
                     return (
                       <div 
                         key={msg.id}
-                        className={`flex gap-2.5 items-end max-w-[85%] ${
+                        className={`flex gap-2.5 items-end max-w-[85%] relative group ${
                           isMe ? 'ml-auto flex-row-reverse' : 'mr-auto'
                         }`}
                       >
@@ -1144,47 +1240,116 @@ export const MessagesSection: React.FC<MessagesSectionProps> = ({
                         )}
 
                         {/* Chat detail block */}
-                        <div className="space-y-1">
+                        <div className="space-y-1 relative">
                           <div className={`p-3.5 rounded-2xl text-xs font-semibold leading-relaxed tracking-tight break-words select-all ${
-                            isMe 
+                            isDeleted 
+                              ? 'bg-theme-bg/60 text-theme-text-secondary/60 italic border border-theme-border/40 rounded-2xl'
+                              : isMe 
                               ? 'bg-[#0095f6] text-white rounded-br-sm shadow-md' 
                               : 'bg-theme-surface dark:bg-theme-border/45 text-theme-text-primary border border-theme-border rounded-bl-sm font-sans'
                           }`}>
-                            {msg.imageUrl && (
-                              <div className="mb-2 max-w-[200px] overflow-hidden rounded-lg shadow-sm">
-                                <img src={msg.imageUrl} alt="Attachement" className="w-full h-auto object-cover cursor-pointer hover:opacity-90" referrerPolicy="no-referrer" />
-                              </div>
-                            )}
-                            {msg.text && (
-                              <p className="whitespace-pre-wrap">{msg.text}</p>
+                            {isDeleted ? (
+                              <p className="flex items-center gap-1.5 opacity-75">
+                                <Slash size={12} />
+                                <span>This message was deleted</span>
+                              </p>
+                            ) : (
+                              <>
+                                {/* Property Context Card */}
+                                {msg.messageType === 'property_context' && msg.payload && (
+                                  <div className="mb-2 bg-white/10 dark:bg-black/20 p-2.5 rounded-xl border border-white/20 dark:border-white/10 space-y-1.5">
+                                    <div className="flex gap-2 items-center">
+                                      {msg.payload.image && (
+                                        <img src={msg.payload.image} alt={msg.payload.title} className="w-10 h-10 rounded-lg object-cover" />
+                                      )}
+                                      <div className="min-w-0">
+                                        <p className="text-[11px] font-black truncate">{msg.payload.title}</p>
+                                        <p className="text-[9px] opacity-80">₹{msg.payload.price?.toLocaleString()}/month</p>
+                                      </div>
+                                    </div>
+                                    {onSelectProperty && (
+                                      <button 
+                                        onClick={() => onSelectProperty(msg.payload.property_id)}
+                                        className="w-full py-1 text-[9px] font-black uppercase tracking-wider bg-white/20 dark:bg-white/10 hover:bg-white/30 rounded-md transition-colors"
+                                      >
+                                        View Property
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Image Gallery Grid Display */}
+                                {msg.messageType === 'image' && msg.payload?.media && Array.isArray(msg.payload.media) && (
+                                  <div className={`mb-2 grid gap-1.5 ${
+                                    msg.payload.media.length === 1 ? 'grid-cols-1' :
+                                    msg.payload.media.length === 2 ? 'grid-cols-2' :
+                                    msg.payload.media.length === 3 ? 'grid-cols-3' : 'grid-cols-2'
+                                  }`}>
+                                    {msg.payload.media.slice(0, 4).map((item: any, idx: number) => (
+                                      <div 
+                                        key={idx} 
+                                        onClick={() => setLightboxUrl(item.secure_url)}
+                                        className="relative aspect-square max-h-40 rounded-lg overflow-hidden cursor-pointer group/img"
+                                      >
+                                        <img 
+                                          src={item.secure_url} 
+                                          alt="Chat photo" 
+                                          className="w-full h-full object-cover transition-transform group-hover/img:scale-105" 
+                                        />
+                                        {idx === 3 && msg.payload.media.length > 4 && (
+                                          <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white font-black text-xs">
+                                            +{msg.payload.media.length - 4}
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {/* Text message content */}
+                                {msg.text && (
+                                  <p className="whitespace-pre-wrap">{msg.text}</p>
+                                )}
+                              </>
                             )}
                           </div>
 
-                          {/* Message Status indicators footer */}
-                          {isMe && (
-                            <div className="flex items-center justify-end gap-1 text-[9px] text-theme-text-secondary/60 select-none font-bold">
-                              <span>
-                                {new Date(msg.timestamp).toLocaleTimeString(undefined, {
-                                  hour: '2-digit',
-                                  minute: '2-digit'
-                                })}
-                              </span>
-                              <span>
-                                {msg.status === 'sending' && (
-                                  <span className="w-2.5 h-2.5 border border-theme-text-secondary/60 border-t-transparent rounded-full inline-block animate-spin" />
+                          {/* Message Status & Action Menu */}
+                          <div className="flex items-center justify-between gap-2 text-[9px] text-theme-text-secondary/60 select-none font-bold">
+                            <span>
+                              {new Date(msg.timestamp).toLocaleTimeString(undefined, {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </span>
+                            
+                            {isMe && !isDeleted && (
+                              <div className="flex items-center gap-1">
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveMsgMenuId(activeMsgMenuId === msg.id ? null : msg.id);
+                                  }}
+                                  className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-theme-bg rounded transition-opacity cursor-pointer"
+                                  title="Message Options"
+                                >
+                                  <MoreVertical size={11} />
+                                </button>
+                                {activeMsgMenuId === msg.id && (
+                                  <div className="absolute right-0 bottom-6 bg-theme-surface border border-theme-border rounded-xl shadow-xl z-30 py-1 min-w-[110px]">
+                                    <button 
+                                      onClick={() => handleDeleteMessage(msg.id)}
+                                      className="w-full px-3 py-1.5 text-left text-xs font-bold text-red-500 hover:bg-red-500/10 flex items-center gap-1.5 transition-colors cursor-pointer"
+                                    >
+                                      <Trash2 size={12} />
+                                      <span>Delete</span>
+                                    </button>
+                                  </div>
                                 )}
-                                {msg.status === 'sent' && (
-                                  <Check size={11} className="stroke-[2.5]" />
-                                )}
-                                {msg.status === 'delivered' && (
-                                  <CheckCheck size={11} className="stroke-[2.5]" />
-                                )}
-                                {msg.status === 'read' && (
-                                  <CheckCheck size={11} className="stroke-[2.5] text-[#0095f6]" />
-                                )}
-                              </span>
-                            </div>
-                          )}
+                                <CheckCheck size={11} className="stroke-[2.5] text-[#0095f6]" />
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
@@ -1209,73 +1374,68 @@ export const MessagesSection: React.FC<MessagesSectionProps> = ({
 
             </div>
 
+            {/* LIGHTBOX FULLSCREEN IMAGE VIEWER MODAL */}
+            {lightboxUrl && (
+              <div 
+                onClick={() => setLightboxUrl(null)}
+                className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 cursor-pointer"
+              >
+                <button 
+                  onClick={() => setLightboxUrl(null)}
+                  className="absolute top-4 right-4 p-2 text-white/80 hover:text-white bg-white/10 rounded-full cursor-pointer z-50"
+                >
+                  <X size={24} />
+                </button>
+                <img 
+                  src={lightboxUrl} 
+                  alt="Full size view" 
+                  className="max-w-full max-h-full object-contain rounded-xl shadow-2xl" 
+                />
+              </div>
+            )}
+
             {/* INPUT FIXED TOOLBAR BOTTOM BAR */}
             <div className="p-3.5 border-t border-theme-border/60 bg-theme-surface flex flex-col gap-2 shrink-0 relative animate-none">
               
-              {/* Simulated image selection preview block before sending */}
-              {selectedAttachmentImage && (
-                <div className="absolute bottom-[105%] left-4 bg-theme-surface border border-theme-border p-2 rounded-2xl shadow-xl z-20 flex flex-row items-center gap-3">
-                  <div className="w-14 h-14 rounded-lg overflow-hidden border border-theme-border shrink-0">
-                    <img src={selectedAttachmentImage} alt="Preview Attachment" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              {/* IMAGE PREVIEW COMPOSER TRAY (With X remove buttons on each image) */}
+              {previewUrls.length > 0 && (
+                <div className="bg-theme-bg/60 border border-theme-border p-3 rounded-2xl space-y-2 font-sans">
+                  <div className="flex justify-between items-center text-xs font-bold text-theme-text-secondary">
+                    <span>{previewUrls.length} image(s) selected</span>
+                    <button 
+                      onClick={() => { setSelectedFiles([]); setPreviewUrls([]); }}
+                      className="text-[10px] text-red-500 uppercase font-black hover:underline"
+                    >
+                      Clear All
+                    </button>
                   </div>
-                  <div className="font-sans text-xs">
-                    <p className="font-black text-theme-text-primary">Image loaded</p>
-                    <p className="text-[10px] text-theme-text-secondary font-bold">Ready to send</p>
-                  </div>
-                  <button 
-                    onClick={() => setSelectedAttachmentImage(null)}
-                    className="p-1.5 hover:bg-red-500/10 text-red-500 rounded-lg ml-2 font-black tracking-wider text-[10px] uppercase cursor-pointer transition-colors"
-                  >
-                    Remove
-                  </button>
-                </div>
-              )}
-
-              {/* Attachment select list panel */}
-              {showAttachMenu && (
-                <div className="absolute bottom-[105%] left-4 bg-theme-surface border border-theme-border rounded-2xl shadow-xl z-20 p-3.5 w-56 space-y-2.5 font-sans">
-                  <p className="text-[9px] font-black text-theme-text-secondary uppercase tracking-widest px-1">Simulate File Upload</p>
-                  <div className="grid grid-cols-3 gap-2">
-                    {MOCK_ATTACHMENT_IMAGES.map((img, i) => (
-                      <button
-                        key={i}
-                        onClick={() => handleSimulateImageUpload(i)}
-                        className="w-full h-12 rounded-lg overflow-hidden border border-theme-border hover:opacity-85 animate-none"
-                      >
-                        <img src={img} alt="Selection option" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                      </button>
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    {previewUrls.map((url, index) => (
+                      <div key={index} className="relative w-16 h-16 rounded-xl overflow-hidden border border-theme-border shrink-0 group">
+                        <img src={url} alt={`Preview ${index}`} className="w-full h-full object-cover" />
+                        <button
+                          onClick={() => handleRemovePreview(index)}
+                          className="absolute top-1 right-1 bg-black/70 hover:bg-red-600 text-white rounded-full p-1 transition-colors"
+                          title="Remove image"
+                        >
+                          <X size={10} />
+                        </button>
+                      </div>
                     ))}
                   </div>
-                  <button 
-                    onClick={() => handleSimulateImageUpload(Math.floor(Math.random() * 3))}
-                    className="w-full py-1.5 bg-theme-accent-soft hover:bg-theme-accent/15 text-theme-accent tracking-wider border border-theme-accent/20 rounded-xl text-[10px] font-black uppercase tracking-widest cursor-pointer transition-colors"
-                  >
-                    Gallery Pick
-                  </button>
                 </div>
               )}
 
-              {/* Quick replies professional list panel */}
+              {/* EMOJI PICKER POPUP */}
               {showEmojiPicker && (
-                <div className="absolute bottom-[105%] right-4 bg-theme-surface border border-theme-border p-3 rounded-2xl shadow-xl z-20 flex flex-col gap-1.5 w-64 text-left">
-                  <span className="text-[9px] font-black uppercase tracking-widest text-theme-text-secondary mb-1 px-1">Quick Replies</span>
-                  {[
-                    "Is this property still available?",
-                    "Can we schedule an in-person tour?",
-                    "Is the security deposit negotiable?",
-                    "Are maintenance charges included?"
-                  ].map((phrase) => (
-                    <button 
-                      key={phrase}
-                      onClick={() => {
-                        setInputText(phrase);
-                        setShowEmojiPicker(false);
-                      }}
-                      className="p-2 text-[10px] font-bold text-theme-text-primary hover:bg-theme-accent-soft/35 rounded-lg text-left transition-colors cursor-pointer border border-transparent hover:border-theme-border font-sans"
-                    >
-                      {phrase}
-                    </button>
-                  ))}
+                <div className="absolute bottom-[105%] right-4 z-30 shadow-2xl rounded-2xl overflow-hidden border border-theme-border">
+                  <EmojiPicker 
+                    onEmojiClick={(emojiData) => {
+                      setInputText(prev => prev + emojiData.emoji);
+                    }}
+                    width={320}
+                    height={380}
+                  />
                 </div>
               )}
 
@@ -1284,14 +1444,9 @@ export const MessagesSection: React.FC<MessagesSectionProps> = ({
                 
                 {/* Plus/Attachment toggle tool */}
                 <button 
-                  onClick={() => {
-                    setShowAttachMenu(!showAttachMenu);
-                    setShowEmojiPicker(false);
-                  }}
-                  className={`p-3 rounded-xl border transition-all active:scale-95 shrink-0 hover:bg-theme-bg cursor-pointer ${
-                    showAttachMenu ? 'bg-theme-accent border-theme-accent text-white' : 'border-theme-border text-theme-text-secondary/70'
-                  }`}
-                  title="Upload File"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="p-3 rounded-xl border border-theme-border text-theme-text-secondary/70 hover:bg-theme-bg active:scale-95 shrink-0 cursor-pointer transition-all"
+                  title="Attach Images (Max 10)"
                 >
                   <Paperclip size={16} />
                 </button>
@@ -1300,8 +1455,9 @@ export const MessagesSection: React.FC<MessagesSectionProps> = ({
                 <div className="flex-grow flex relative flex-row items-center bg-theme-bg border border-theme-border/80 focus-within:border-theme-accent rounded-xl px-3 transition-colors">
                   <input 
                     type="text" 
-                    placeholder="Message..." 
+                    placeholder={uploadingMedia ? "Uploading photos..." : "Message..."} 
                     value={inputText}
+                    disabled={uploadingMedia}
                     onChange={(e) => setInputText(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
@@ -1313,21 +1469,21 @@ export const MessagesSection: React.FC<MessagesSectionProps> = ({
                   
                   {/* Smiley/emoji click button inside list */}
                   <button 
-                    onClick={() => {
-                      setShowEmojiPicker(!showEmojiPicker);
-                      setShowAttachMenu(false);
-                    }}
+                    onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                     className="p-1.5 rounded-lg text-theme-text-secondary/60 hover:text-theme-accent transition-all shrink-0 cursor-pointer"
-                    title="Quick Replies"
+                    title="Emoji Picker"
                   >
-                    <Zap size={14} className="stroke-[2.5]" />
+                    <Smile size={16} />
                   </button>
                 </div>
 
                 {/* Send button */}
                 <button 
                   onClick={handleSendMessage}
-                  className="p-3.5 rounded-xl bg-theme-accent hover:bg-theme-accent-hover text-white flex items-center justify-center shadow-md shadow-theme-accent/20 active:scale-95 transition-all shrink-0 cursor-pointer"
+                  disabled={uploadingMedia}
+                  className={`p-3.5 rounded-xl bg-theme-accent hover:bg-theme-accent-hover text-white flex items-center justify-center shadow-md shadow-theme-accent/20 active:scale-95 transition-all shrink-0 cursor-pointer ${
+                    uploadingMedia ? 'opacity-50 cursor-wait' : ''
+                  }`}
                   title="Send"
                 >
                   <Send size={15} />
@@ -1336,7 +1492,7 @@ export const MessagesSection: React.FC<MessagesSectionProps> = ({
               </div>
 
             </div>
-          </>
+          </div>
         )}
 
           {/* CALL USER INTERFACE OVERLAY */}
@@ -1672,3 +1828,5 @@ export const MessagesSection: React.FC<MessagesSectionProps> = ({
     </div>
   );
 };
+
+export default MessagesSection;

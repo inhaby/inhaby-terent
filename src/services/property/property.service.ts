@@ -1,4 +1,4 @@
-import { supabase, getThumbnailUrl, getGalleryUrl } from '@inhaby/shared';
+import { supabase, getThumbnailUrl, getGalleryUrl, getAvatarUrl } from '@inhaby/shared';
 import { Property, Section } from '../../types';
 
 export function mapSupabasePropertyToModel(dbProp: any): Property {
@@ -75,7 +75,7 @@ export function mapSupabasePropertyToModel(dbProp: any): Property {
     property_type: dbProp.property_type,
     owner: {
       name: dbProp.owner?.name || 'Owner',
-      image: dbProp.owner?.avatar_url || 'https://i.pravatar.cc/150',
+      image: getAvatarUrl(dbProp.owner?.avatar_url, dbProp.owner?.name || 'Owner'),
       verified: dbProp.owner?.is_verified || false,
       activeSince: 'Recently'
     },

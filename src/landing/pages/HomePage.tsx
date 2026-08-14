@@ -8,6 +8,7 @@ import VerificationSection from "../components/VerificationSection";
 import AppPreview from "../components/AppPreview";
 import Benefits from "../components/Benefits";
 import Testimonials from "../components/Testimonials";
+import BlogSection from "../components/BlogSection";
 import FAQ from "../components/FAQ";
 import FinalCTA from "../components/FinalCTA";
 
@@ -24,6 +25,7 @@ export default function HomePage() {
       <AppPreview />
       <Benefits />
       <Testimonials />
+      <BlogSection />
       <FAQ />
       <FinalCTA />
     </main>

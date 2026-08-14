@@ -12,6 +12,9 @@ import ReactMarkdown from "react-markdown";
 import OptimizedImage from "../components/OptimizedImage";
 import { BLOG_ARTICLES, BlogArticle } from "../data/blogData";
 
+// Dynamic import maps for markdown articles
+const articleModules = (import.meta as any).glob("../articles/*.md", { query: "?raw", import: "default" });
+
 export default function BlogPage({ overrideSlug }: { overrideSlug?: string }) {
   const { slug: urlSlug } = useParams<{ slug: string }>();
   const slug = overrideSlug || urlSlug;
@@ -29,6 +32,31 @@ export default function BlogPage({ overrideSlug }: { overrideSlug?: string }) {
     return BLOG_ARTICLES.find((a) => a.slug === slug);
   }, [slug]);
 
+  const [content, setContent] = useState<string>("");
+  const [loadingContent, setLoadingContent] = useState(true);
+
+  useEffect(() => {
+    const loadContent = async () => {
+      if (!slug) return;
+      setLoadingContent(true);
+      try {
+        const matchingKey = Object.keys(articleModules).find(key => key.endsWith(`/${slug}.md`));
+        if (matchingKey) {
+          const rawContent = await articleModules[matchingKey]() as string;
+          setContent(rawContent);
+        } else {
+          setContent("# Article Not Found\nSorry, the requested article could not be loaded.");
+        }
+      } catch (err) {
+        console.error("Error loading article content:", err);
+        setContent("# Error Loading Content\nThere was an issue loading the article content.");
+      } finally {
+        setLoadingContent(false);
+      }
+    };
+    loadContent();
+  }, [slug]);
+
   // If article not found, redirect safely to blog listing
   if (!article) {
     return <Navigate to="/blog" replace />;
@@ -36,7 +64,8 @@ export default function BlogPage({ overrideSlug }: { overrideSlug?: string }) {
 
   // Generate dynamic table of contents sections based on headings
   const parsedSections = useMemo(() => {
-    const lines = article.content.split("\n");
+    if (!content) return [{ id: "intro", label: "Introduction" }];
+    const lines = content.split("\n");
     const sectionsList = [{ id: "intro", label: "Introduction" }];
     
     lines.forEach((line) => {
@@ -50,7 +79,7 @@ export default function BlogPage({ overrideSlug }: { overrideSlug?: string }) {
     });
     
     return sectionsList;
-  }, [article]);
+  }, [content]);
 
   // FAQ state initialization
   const [faqOpen, setFaqOpen] = useState<Record<number, boolean>>({
@@ -100,7 +129,7 @@ export default function BlogPage({ overrideSlug }: { overrideSlug?: string }) {
   };
 
   const handleCopyMarkdown = () => {
-    navigator.clipboard.writeText(article.content);
+    navigator.clipboard.writeText(content);
     setCopiedMarkdown(true);
     setTimeout(() => setCopiedMarkdown(false), 2000);
   };
@@ -378,118 +407,134 @@ export default function BlogPage({ overrideSlug }: { overrideSlug?: string }) {
                   {/* Let the markdown handle rendering */}
                 </div>
 
-                <ReactMarkdown
-                  components={{
-                    h1: ({ children }) => <h1 className="text-3xl font-black text-foreground tracking-tight font-sans mt-8 mb-4 border-b border-border pb-2">{children}</h1>,
-                    h2: ({ children }) => {
-                      const text = String(children || "");
-                      const id = text.toLowerCase()
-                        .replace(/[^a-z0-9]+/g, "-")
-                        .replace(/(^-|-$)/g, "");
-                      return (
-                        <h2 id={id} className="text-2xl font-black text-foreground tracking-tight font-sans mt-12 mb-6 scroll-mt-24 border-b border-border/40 pb-2 flex items-center">
-                          <span className="text-primary mr-3 text-lg">✦</span>
-                          {children}
-                        </h2>
-                      );
-                    },
-                    h3: ({ children }) => {
-                      const text = String(children || "");
-                      const id = text.toLowerCase()
-                        .replace(/[^a-z0-9]+/g, "-")
-                        .replace(/(^-|-$)/g, "");
-                      return (
-                        <h3 id={id} className="text-lg font-black text-foreground tracking-tight font-sans mt-8 mb-4 scroll-mt-24">
-                          {children}
-                        </h3>
-                      );
-                    },
-                    p: ({ children }) => <p className="text-muted-foreground font-medium leading-relaxed mb-6">{children}</p>,
-                    ul: ({ children }) => <ul className="list-disc list-inside space-y-2 text-muted-foreground font-semibold mb-6 pl-2">{children}</ul>,
-                    ol: ({ children }) => <ol className="list-decimal list-inside space-y-2 text-muted-foreground font-semibold mb-6 pl-2">{children}</ol>,
-                    li: ({ children }) => <li className="text-muted-foreground">{children}</li>,
-                    blockquote: ({ children }) => {
-                      const childEl = Array.isArray(children) ? children[1] || children[0] : children;
-                      const contentStr = String((childEl as any)?.props?.children || childEl || "");
-                      
-                      if (contentStr.includes("⚠️ WARNING") || contentStr.includes("CRITICAL WARNING")) {
+                {loadingContent ? (
+                  <div className="space-y-6 py-8">
+                    <div className="h-6 w-3/4 rounded shimmer-bg" />
+                    <div className="space-y-3">
+                      <div className="h-4 w-full rounded shimmer-bg" />
+                      <div className="h-4 w-5/6 rounded shimmer-bg" />
+                      <div className="h-4 w-4/5 rounded shimmer-bg" />
+                    </div>
+                    <div className="h-40 w-full rounded-2xl shimmer-bg" />
+                    <div className="space-y-3">
+                      <div className="h-4 w-full rounded shimmer-bg" />
+                      <div className="h-4 w-11/12 rounded shimmer-bg" />
+                    </div>
+                  </div>
+                ) : (
+                  <ReactMarkdown
+                    components={{
+                      h1: ({ children }) => <h1 className="text-3xl font-black text-foreground tracking-tight font-sans mt-8 mb-4 border-b border-border pb-2">{children}</h1>,
+                      h2: ({ children }) => {
+                        const text = String(children || "");
+                        const id = text.toLowerCase()
+                          .replace(/[^a-z0-9]+/g, "-")
+                          .replace(/(^-|-$)/g, "");
                         return (
-                          <div className="p-6 md:p-8 bg-rose-500/5 dark:bg-rose-500/10 border-l-4 border-rose-500 rounded-3xl my-8 space-y-3">
-                            <div className="flex items-center space-x-2.5 text-rose-600 font-black text-xs uppercase tracking-wider">
-                              <AlertTriangle className="w-5 h-5 shrink-0" />
-                              <span>CRITICAL WARNING</span>
-                            </div>
-                            <p className="text-xs sm:text-sm text-foreground/90 font-semibold leading-relaxed">
-                              {contentStr.replace(/⚠️ WARNING:?\s*/i, "").replace(/CRITICAL WARNING:?\s*/i, "")}
-                            </p>
-                          </div>
+                          <h2 id={id} className="text-2xl font-black text-foreground tracking-tight font-sans mt-12 mb-6 scroll-mt-24 border-b border-border/40 pb-2 flex items-center">
+                            <span className="text-primary mr-3 text-lg">✦</span>
+                            {children}
+                          </h2>
                         );
-                      }
-                      
-                      if (contentStr.includes("💡 EXPERT TIP")) {
+                      },
+                      h3: ({ children }) => {
+                        const text = String(children || "");
+                        const id = text.toLowerCase()
+                          .replace(/[^a-z0-9]+/g, "-")
+                          .replace(/(^-|-$)/g, "");
                         return (
-                          <div className="p-6 md:p-8 bg-primary/5 border-l-4 border-primary rounded-3xl my-8 space-y-3">
-                            <div className="flex items-center space-x-2.5 text-primary font-black text-xs uppercase tracking-wider">
-                              <Lightbulb className="w-5 h-5 shrink-0" />
-                              <span>💡 EXPERT TIP</span>
-                            </div>
-                            <p className="text-xs sm:text-sm text-foreground/90 font-semibold leading-relaxed">
-                              {contentStr.replace(/💡 EXPERT TIP:?\s*/i, "")}
-                            </p>
-                          </div>
+                          <h3 id={id} className="text-lg font-black text-foreground tracking-tight font-sans mt-8 mb-4 scroll-mt-24">
+                            {children}
+                          </h3>
                         );
-                      }
-
-                      if (contentStr.includes("Question:") || contentStr.includes("Direct Answer:")) {
-                        const lines = contentStr.split("\n").map(l => l.trim()).filter(Boolean);
-                        const question = lines.find(l => l.startsWith("Question:"))?.replace("Question:", "").trim();
-                        const answer = lines.find(l => l.startsWith("Direct Answer:"))?.replace("Direct Answer:", "").trim();
+                      },
+                      p: ({ children }) => <p className="text-muted-foreground font-medium leading-relaxed mb-6">{children}</p>,
+                      ul: ({ children }) => <ul className="list-disc list-inside space-y-2 text-muted-foreground font-semibold mb-6 pl-2">{children}</ul>,
+                      ol: ({ children }) => <ol className="list-decimal list-inside space-y-2 text-muted-foreground font-semibold mb-6 pl-2">{children}</ol>,
+                      li: ({ children }) => <li className="text-muted-foreground">{children}</li>,
+                      blockquote: ({ children }) => {
+                        const childEl = Array.isArray(children) ? children[1] || children[0] : children;
+                        const contentStr = String((childEl as any)?.props?.children || childEl || "");
                         
-                        return (
-                          <div className="bg-muted/80 border border-border rounded-3xl p-6 md:p-8 my-8 space-y-4">
-                            <div className="flex items-center space-x-2 text-primary font-black text-xs uppercase tracking-wider">
-                              <HelpCircle className="w-4 h-4" />
-                              <span>Question Engine Overview</span>
-                            </div>
-                            {question && (
-                              <p className="text-sm font-black text-foreground">
-                                {question}
-                              </p>
-                            )}
-                            {answer && (
-                              <div className="border-l-4 border-primary pl-4 py-1 italic text-xs sm:text-sm md:text-base text-foreground font-semibold leading-relaxed bg-primary/3 pr-2 rounded-r-xl">
-                                <strong>Direct Answer:</strong> {answer}
+                        if (contentStr.includes("⚠️ WARNING") || contentStr.includes("CRITICAL WARNING")) {
+                          return (
+                            <div className="p-6 md:p-8 bg-rose-500/5 dark:bg-rose-500/10 border-l-4 border-rose-500 rounded-3xl my-8 space-y-3">
+                              <div className="flex items-center space-x-2.5 text-rose-600 font-black text-xs uppercase tracking-wider">
+                                <AlertTriangle className="w-5 h-5 shrink-0" />
+                                <span>CRITICAL WARNING</span>
                               </div>
-                            )}
-                          </div>
-                        );
-                      }
+                              <p className="text-xs sm:text-sm text-foreground/90 font-semibold leading-relaxed">
+                                {contentStr.replace(/⚠️ WARNING:?\s*/i, "").replace(/CRITICAL WARNING:?\s*/i, "")}
+                              </p>
+                            </div>
+                          );
+                        }
+                        
+                        if (contentStr.includes("💡 EXPERT TIP")) {
+                          return (
+                            <div className="p-6 md:p-8 bg-primary/5 border-l-4 border-primary rounded-3xl my-8 space-y-3">
+                              <div className="flex items-center space-x-2.5 text-primary font-black text-xs uppercase tracking-wider">
+                                <Lightbulb className="w-5 h-5 shrink-0" />
+                                <span>💡 EXPERT TIP</span>
+                              </div>
+                              <p className="text-xs sm:text-sm text-foreground/90 font-semibold leading-relaxed">
+                                {contentStr.replace(/💡 EXPERT TIP:?\s*/i, "")}
+                              </p>
+                            </div>
+                          );
+                        }
 
-                      return (
-                        <blockquote className="border-l-4 border-primary pl-4 py-2 italic text-muted-foreground my-6 bg-primary-soft/10 pr-2 rounded-r-xl">
-                          {children}
-                        </blockquote>
-                      );
-                    },
-                    table: ({ children }) => (
-                      <div className="overflow-x-auto border border-border rounded-3xl shadow-xs my-8">
-                        <table className="w-full text-xs text-left border-collapse">{children}</table>
-                      </div>
-                    ),
-                    thead: ({ children }) => (
-                      <thead className="bg-muted/80 text-foreground font-black uppercase border-b border-border text-[10px] tracking-widest">{children}</thead>
-                    ),
-                    tbody: ({ children }) => (
-                      <tbody className="divide-y divide-border/40 font-semibold text-foreground/90 bg-background/50">{children}</tbody>
-                    ),
-                    tr: ({ children }) => <tr className="hover:bg-muted/20 transition-colors">{children}</tr>,
-                    th: ({ children }) => <th className="px-5 py-4">{children}</th>,
-                    td: ({ children }) => <td className="px-5 py-4">{children}</td>,
-                    hr: () => <hr className="border-border/60 my-12" />
-                  }}
-                >
-                  {article.content}
-                </ReactMarkdown>
+                        if (contentStr.includes("Question:") || contentStr.includes("Direct Answer:")) {
+                          const lines = contentStr.split("\n").map(l => l.trim()).filter(Boolean);
+                          const question = lines.find(l => l.startsWith("Question:"))?.replace("Question:", "").trim();
+                          const answer = lines.find(l => l.startsWith("Direct Answer:"))?.replace("Direct Answer:", "").trim();
+                          
+                          return (
+                            <div className="bg-muted/80 border border-border rounded-3xl p-6 md:p-8 my-8 space-y-4">
+                              <div className="flex items-center space-x-2 text-primary font-black text-xs uppercase tracking-wider">
+                                <HelpCircle className="w-4 h-4" />
+                                <span>Question Engine Overview</span>
+                              </div>
+                              {question && (
+                                <p className="text-sm font-black text-foreground">
+                                  {question}
+                                </p>
+                              )}
+                              {answer && (
+                                <div className="border-l-4 border-primary pl-4 py-1 italic text-xs sm:text-sm md:text-base text-foreground font-semibold leading-relaxed bg-primary/3 pr-2 rounded-r-xl">
+                                  <strong>Direct Answer:</strong> {answer}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <blockquote className="border-l-4 border-primary pl-4 py-2 italic text-muted-foreground my-6 bg-primary-soft/10 pr-2 rounded-r-xl">
+                            {children}
+                          </blockquote>
+                        );
+                      },
+                      table: ({ children }) => (
+                        <div className="overflow-x-auto border border-border rounded-3xl shadow-xs my-8">
+                          <table className="w-full text-xs text-left border-collapse">{children}</table>
+                        </div>
+                      ),
+                      thead: ({ children }) => (
+                        <thead className="bg-muted/80 text-foreground font-black uppercase border-b border-border text-[10px] tracking-widest">{children}</thead>
+                      ),
+                      tbody: ({ children }) => (
+                        <tbody className="divide-y divide-border/40 font-semibold text-foreground/90 bg-background/50">{children}</tbody>
+                      ),
+                      tr: ({ children }) => <tr className="hover:bg-muted/20 transition-colors">{children}</tr>,
+                      th: ({ children }) => <th className="px-5 py-4">{children}</th>,
+                      td: ({ children }) => <td className="px-5 py-4">{children}</td>,
+                      hr: () => <hr className="border-border/60 my-12" />
+                    }}
+                  >
+                    {content}
+                  </ReactMarkdown>
+                )}
 
                 {/* WRITTEN AUTHOR CARD BIO */}
                 <div className="p-8 bg-muted/40 border border-border rounded-[2.5rem] mt-16 space-y-6">

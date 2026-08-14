@@ -195,23 +195,23 @@ export const PropertyDetailsPage: React.FC<PropertyDetailsPageProps> = ({
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-6">
 
-        {/* 2. AIRBNB BENTO GALLERY GRID WITHOUT MODAL CONTAINER SCROLLS */}
+        {/* 2. COMPACT PRODUCT-DETAIL STYLE MEDIA GALLERY */}
         
-        {/* Mobile Gallery (Carousel) */}
+        {/* Mobile Gallery (Carousel with object-contain inside 16:9 container) */}
         <div 
           onClick={() => setGalleryIndex(activeImageIndex)}
-          className="block md:hidden relative aspect-[16/9] rounded-2xl overflow-hidden bg-black select-none pointer-events-auto cursor-pointer"
+          className="block md:hidden relative aspect-[16/9] max-h-[280px] rounded-2xl overflow-hidden bg-gallery-cell-bg border border-gallery-cell-border shadow-sm select-none pointer-events-auto cursor-pointer flex items-center justify-center"
         >
           {(property.images?.[activeImageIndex] || property.image) ? (
             <LazyImage 
               src={property.images?.[activeImageIndex] || property.image} 
               alt={property.title} 
-              className="w-full h-full object-contain opacity-95 transition-all duration-350"
+              className="w-full h-full object-contain transition-all duration-300"
               referrerPolicy="no-referrer"
             />
           ) : (
-            <div className="w-full h-full bg-zinc-100 flex flex-col items-center justify-center text-zinc-400">
-              <CameraOff className="w-10 h-10 mb-2" />
+            <div className="w-full h-full bg-gallery-cell-bg flex flex-col items-center justify-center text-theme-text-secondary">
+              <CameraOff className="w-10 h-10 mb-2 opacity-60" />
               <span className="text-xs font-bold uppercase tracking-wider">No photos available</span>
             </div>
           )}
@@ -219,7 +219,7 @@ export const PropertyDetailsPage: React.FC<PropertyDetailsPageProps> = ({
           
           {/* Dot Controls */}
           {property.images && property.images.length > 1 && (
-            <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-1.5 z-10">
+            <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5 z-10">
               {property.images.map((_, i) => (
                 <button 
                   key={i}
@@ -234,11 +234,11 @@ export const PropertyDetailsPage: React.FC<PropertyDetailsPageProps> = ({
           )}
         </div>
 
-        {/* Tablet & Desktop Dynamic Gallery Grid */}
-        <div className="hidden md:block">
+        {/* Desktop / Tablet Compact Product-Detail Gallery Grid (Bounded to max 1200px wide, max 450px height) */}
+        <div className="hidden md:block max-w-[1200px] mx-auto">
           {galleryImages.length === 0 && (
-            <div className="aspect-[16/9] bg-[#1c1c1e] rounded-3xl overflow-hidden flex flex-col items-center justify-center text-zinc-400 border border-theme-border/50 shadow-md">
-              <CameraOff className="w-12 h-12 mb-2" />
+            <div className="h-[380px] sm:h-[420px] md:h-[450px] bg-theme-surface rounded-3xl overflow-hidden flex flex-col items-center justify-center text-theme-text-secondary border border-theme-border/50 shadow-[0_4px_24px_rgba(0,0,0,0.03)]">
+              <CameraOff className="w-12 h-12 mb-2 opacity-60" />
               <span className="text-xs font-bold uppercase tracking-wider">No photos available for this property</span>
             </div>
           )}
@@ -246,86 +246,127 @@ export const PropertyDetailsPage: React.FC<PropertyDetailsPageProps> = ({
           {galleryImages.length === 1 && (
             <div 
               onClick={() => setGalleryIndex(0)}
-              className="aspect-[16/9] bg-[#1c1c1e] rounded-3xl overflow-hidden relative cursor-pointer group border border-theme-border/50 shadow-md flex items-center justify-center"
+              className="h-[380px] sm:h-[420px] md:h-[450px] bg-theme-surface rounded-3xl overflow-hidden relative cursor-pointer border border-theme-border/50 p-2.5 shadow-[0_4px_24px_rgba(0,0,0,0.03)] flex items-center justify-center group"
             >
-              <LazyImage 
-                src={galleryImages[0]} 
-                alt={property.title} 
-                className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-102"
-                referrerPolicy="no-referrer"
-              />
+              <div className="w-full h-full rounded-2xl overflow-hidden bg-gallery-cell-bg border border-gallery-cell-border flex items-center justify-center">
+                <LazyImage 
+                  src={galleryImages[0]} 
+                  alt={property.title} 
+                  className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-102"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
             </div>
           )}
 
           {galleryImages.length === 2 && (
-            <div className="grid grid-cols-2 gap-3 aspect-[16/9] bg-[#1c1c1e] rounded-3xl overflow-hidden relative group border border-theme-border/50 shadow-md">
-              <div onClick={() => setGalleryIndex(0)} className="overflow-hidden relative cursor-pointer h-full">
-                <LazyImage src={galleryImages[0]} alt={property.title} className="w-full h-full object-cover transition-transform duration-700 hover:scale-103" referrerPolicy="no-referrer" />
+            <div className="grid grid-cols-12 gap-3 h-[380px] sm:h-[420px] md:h-[450px] bg-theme-surface rounded-3xl overflow-hidden border border-theme-border/50 p-2.5 shadow-[0_4px_24px_rgba(0,0,0,0.03)]">
+              <div 
+                onClick={() => setGalleryIndex(0)}
+                className="col-span-7 h-full rounded-2xl overflow-hidden relative cursor-pointer bg-gallery-cell-bg border border-gallery-cell-border flex items-center justify-center group hover:border-theme-accent/30 transition-all"
+              >
+                <LazyImage src={galleryImages[0]} alt={property.title} className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-102" referrerPolicy="no-referrer" />
               </div>
-              <div onClick={() => setGalleryIndex(1)} className="overflow-hidden relative cursor-pointer h-full">
-                <LazyImage src={galleryImages[1]} alt={property.title} className="w-full h-full object-cover transition-transform duration-700 hover:scale-103" referrerPolicy="no-referrer" />
+              <div 
+                onClick={() => setGalleryIndex(1)}
+                className="col-span-5 h-full rounded-2xl overflow-hidden relative cursor-pointer bg-gallery-cell-bg border border-gallery-cell-border flex items-center justify-center group hover:border-theme-accent/30 transition-all"
+              >
+                <LazyImage src={galleryImages[1]} alt={property.title} className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-102" referrerPolicy="no-referrer" />
               </div>
             </div>
           )}
 
           {galleryImages.length === 3 && (
-            <div className="grid grid-cols-3 gap-3 aspect-[16/9] bg-[#1c1c1e] rounded-3xl overflow-hidden relative group border border-theme-border/50 shadow-md">
-              <div onClick={() => setGalleryIndex(0)} className="col-span-2 overflow-hidden relative cursor-pointer h-full">
-                <LazyImage src={galleryImages[0]} alt={property.title} className="w-full h-full object-cover transition-transform duration-700 hover:scale-103" referrerPolicy="no-referrer" />
+            <div className="grid grid-cols-12 gap-3 h-[380px] sm:h-[420px] md:h-[450px] bg-theme-surface rounded-3xl overflow-hidden border border-theme-border/50 p-2.5 shadow-[0_4px_24px_rgba(0,0,0,0.03)]">
+              <div 
+                onClick={() => setGalleryIndex(0)}
+                className="col-span-7 h-full rounded-2xl overflow-hidden relative cursor-pointer bg-gallery-cell-bg border border-gallery-cell-border flex items-center justify-center group hover:border-theme-accent/30 transition-all"
+              >
+                <LazyImage src={galleryImages[0]} alt={property.title} className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-102" referrerPolicy="no-referrer" />
               </div>
-              <div className="grid grid-rows-2 gap-3 h-full">
-                <div onClick={() => setGalleryIndex(1)} className="overflow-hidden relative cursor-pointer h-full">
-                  <LazyImage src={galleryImages[1]} alt={property.title} className="w-full h-full object-cover transition-transform duration-700 hover:scale-103" referrerPolicy="no-referrer" />
+              <div className="col-span-5 grid grid-rows-2 gap-3 h-full min-h-0">
+                <div 
+                  onClick={() => setGalleryIndex(1)}
+                  className="h-full rounded-2xl overflow-hidden relative cursor-pointer bg-gallery-cell-bg border border-gallery-cell-border flex items-center justify-center group hover:border-theme-accent/30 transition-all"
+                >
+                  <LazyImage src={galleryImages[1]} alt={property.title} className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-102" referrerPolicy="no-referrer" />
                 </div>
-                <div onClick={() => setGalleryIndex(2)} className="overflow-hidden relative cursor-pointer h-full">
-                  <LazyImage src={galleryImages[2]} alt={property.title} className="w-full h-full object-cover transition-transform duration-700 hover:scale-103" referrerPolicy="no-referrer" />
+                <div 
+                  onClick={() => setGalleryIndex(2)}
+                  className="h-full rounded-2xl overflow-hidden relative cursor-pointer bg-gallery-cell-bg border border-gallery-cell-border flex items-center justify-center group hover:border-theme-accent/30 transition-all"
+                >
+                  <LazyImage src={galleryImages[2]} alt={property.title} className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-102" referrerPolicy="no-referrer" />
                 </div>
               </div>
             </div>
           )}
 
           {galleryImages.length === 4 && (
-            <div className="grid grid-cols-4 grid-rows-2 gap-3 aspect-[16/9] bg-[#1c1c1e] rounded-3xl overflow-hidden relative group border border-theme-border/50 shadow-md">
-              <div onClick={() => setGalleryIndex(0)} className="col-span-2 row-span-2 overflow-hidden relative cursor-pointer">
-                <LazyImage src={galleryImages[0]} alt={property.title} className="w-full h-full object-cover transition-transform duration-700 hover:scale-103" referrerPolicy="no-referrer" />
+            <div className="grid grid-cols-12 gap-3 h-[380px] sm:h-[420px] md:h-[450px] bg-theme-surface rounded-3xl overflow-hidden border border-theme-border/50 p-2.5 shadow-[0_4px_24px_rgba(0,0,0,0.03)]">
+              <div 
+                onClick={() => setGalleryIndex(0)}
+                className="col-span-7 h-full rounded-2xl overflow-hidden relative cursor-pointer bg-gallery-cell-bg border border-gallery-cell-border flex items-center justify-center group hover:border-theme-accent/30 transition-all"
+              >
+                <LazyImage src={galleryImages[0]} alt={property.title} className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-102" referrerPolicy="no-referrer" />
               </div>
-              <div onClick={() => setGalleryIndex(1)} className="overflow-hidden relative cursor-pointer">
-                <LazyImage src={galleryImages[1]} alt={property.title} className="w-full h-full object-cover transition-transform duration-700 hover:scale-103" referrerPolicy="no-referrer" />
-              </div>
-              <div onClick={() => setGalleryIndex(2)} className="overflow-hidden relative cursor-pointer">
-                <LazyImage src={galleryImages[2]} alt={property.title} className="w-full h-full object-cover transition-transform duration-700 hover:scale-103" referrerPolicy="no-referrer" />
-              </div>
-              <div onClick={() => setGalleryIndex(3)} className="col-span-2 overflow-hidden relative cursor-pointer">
-                <LazyImage src={galleryImages[3]} alt={property.title} className="w-full h-full object-cover transition-transform duration-700 hover:scale-103" referrerPolicy="no-referrer" />
+              <div className="col-span-5 grid grid-rows-2 gap-3 h-full min-h-0">
+                <div 
+                  onClick={() => setGalleryIndex(1)}
+                  className="h-full rounded-2xl overflow-hidden relative cursor-pointer bg-gallery-cell-bg border border-gallery-cell-border flex items-center justify-center group hover:border-theme-accent/30 transition-all"
+                >
+                  <LazyImage src={galleryImages[1]} alt={property.title} className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-102" referrerPolicy="no-referrer" />
+                </div>
+                <div className="grid grid-cols-2 gap-3 h-full min-h-0">
+                  <div 
+                    onClick={() => setGalleryIndex(2)}
+                    className="h-full rounded-2xl overflow-hidden relative cursor-pointer bg-gallery-cell-bg border border-gallery-cell-border flex items-center justify-center group hover:border-theme-accent/30 transition-all"
+                  >
+                    <LazyImage src={galleryImages[2]} alt={property.title} className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-102" referrerPolicy="no-referrer" />
+                  </div>
+                  <div 
+                    onClick={() => setGalleryIndex(3)}
+                    className="h-full rounded-2xl overflow-hidden relative cursor-pointer bg-gallery-cell-bg border border-gallery-cell-border flex items-center justify-center group hover:border-theme-accent/30 transition-all"
+                  >
+                    <LazyImage src={galleryImages[3]} alt={property.title} className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-102" referrerPolicy="no-referrer" />
+                  </div>
+                </div>
               </div>
             </div>
           )}
 
           {galleryImages.length >= 5 && (
-            <div className="grid grid-cols-4 grid-rows-2 gap-3 aspect-[16/9] bg-[#1c1c1e] rounded-3xl overflow-hidden relative group border border-theme-border/50 shadow-md">
-              <div onClick={() => setGalleryIndex(0)} className="col-span-2 row-span-2 overflow-hidden relative cursor-pointer">
-                <LazyImage src={galleryImages[0]} alt={property.title} className="w-full h-full object-cover transition-transform duration-700 hover:scale-103" referrerPolicy="no-referrer" />
-              </div>
-              <div onClick={() => setGalleryIndex(1)} className="overflow-hidden relative cursor-pointer">
-                <LazyImage src={galleryImages[1]} alt={property.title} className="w-full h-full object-cover transition-transform duration-700 hover:scale-103" referrerPolicy="no-referrer" />
-              </div>
-              <div onClick={() => setGalleryIndex(2)} className="overflow-hidden relative cursor-pointer">
-                <LazyImage src={galleryImages[2]} alt={property.title} className="w-full h-full object-cover transition-transform duration-700 hover:scale-103" referrerPolicy="no-referrer" />
-              </div>
-              <div onClick={() => setGalleryIndex(3)} className="overflow-hidden relative cursor-pointer">
-                <LazyImage src={galleryImages[3]} alt={property.title} className="w-full h-full object-cover transition-transform duration-700 hover:scale-103" referrerPolicy="no-referrer" />
-              </div>
-              <div onClick={() => setGalleryIndex(4)} className="overflow-hidden relative cursor-pointer">
-                <LazyImage src={galleryImages[4]} alt={property.title} className="w-full h-full object-cover transition-transform duration-700 hover:scale-103" referrerPolicy="no-referrer" />
-              </div>
-
-              <button
+            <div className="grid grid-cols-12 gap-3 h-[380px] sm:h-[420px] md:h-[450px] bg-theme-surface rounded-3xl overflow-hidden border border-theme-border/50 p-2.5 shadow-[0_4px_24px_rgba(0,0,0,0.03)] relative">
+              <div 
                 onClick={() => setGalleryIndex(0)}
-                className="absolute bottom-5 right-5 px-4 py-2 bg-black/75 hover:bg-black/90 backdrop-blur-md text-white text-[10px] font-black uppercase tracking-wider rounded-xl border border-white/20 transition-all flex items-center gap-1.5 shadow-md cursor-pointer z-10"
+                className="col-span-7 h-full rounded-2xl overflow-hidden relative cursor-pointer bg-gallery-cell-bg border border-gallery-cell-border flex items-center justify-center group hover:border-theme-accent/30 transition-all"
               >
-                <LayoutGrid className="w-3.5 h-3.5" />
-                <span>Show all {galleryImages.length} photos</span>
-              </button>
+                <LazyImage src={galleryImages[0]} alt={property.title} className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-102" referrerPolicy="no-referrer" />
+              </div>
+              <div className="col-span-5 grid grid-rows-2 gap-3 h-full min-h-0">
+                <div 
+                  onClick={() => setGalleryIndex(1)}
+                  className="h-full rounded-2xl overflow-hidden relative cursor-pointer bg-gallery-cell-bg border border-gallery-cell-border flex items-center justify-center group hover:border-theme-accent/30 transition-all"
+                >
+                  <LazyImage src={galleryImages[1]} alt={property.title} className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-102" referrerPolicy="no-referrer" />
+                </div>
+                <div 
+                  onClick={() => setGalleryIndex(2)}
+                  className="h-full rounded-2xl overflow-hidden relative cursor-pointer bg-gallery-cell-bg border border-gallery-cell-border flex items-center justify-center group hover:border-theme-accent/30 transition-all"
+                >
+                  <LazyImage src={galleryImages[2]} alt={property.title} className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-102" referrerPolicy="no-referrer" />
+                  
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setGalleryIndex(0);
+                    }}
+                    className="absolute inset-0 bg-black/60 hover:bg-black/75 transition-colors flex items-center justify-center gap-2 text-white font-black text-xs uppercase tracking-wider cursor-pointer z-10"
+                  >
+                    <LayoutGrid className="w-4 h-4" />
+                    <span>View all {galleryImages.length} photos</span>
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>

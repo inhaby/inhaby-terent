@@ -12,6 +12,9 @@
   --muted: #F5F1EB;
   --border: #E6DFD5;
   
+  --gallery-cell-bg: #FAFAF8;
+  --gallery-cell-border: #EAEAEA;
+
   --primary: #C25D3D;
   --primary-foreground: #FFFFFF;
   --primary-soft: #FDF5F2;
@@ -34,6 +37,8 @@
   --muted-foreground: #55738A;
   --muted: #F5F1EB;
   --border: #E6DFD5;
+  --gallery-cell-bg: #FAFAF8;
+  --gallery-cell-border: #EAEAEA;
 }
 
 .theme-dark, [data-theme="dark"] {
@@ -46,6 +51,8 @@
   --muted-foreground: #8FA3B5;
   --muted: #161B22;
   --border: #21262D;
+  --gallery-cell-bg: #1B1D1F;
+  --gallery-cell-border: #2B2E33;
 }
 
 /* --- ACCENT CONFIGURATIONS: Support both classes and data attributes --- */

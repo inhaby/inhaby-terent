@@ -19,27 +19,14 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL || "https://yycdwqnncsixbkcjyi
 const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || "";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Import static blog data for SEO lookups
-let BLOG_POSTS: any[] = [];
-try {
-  // Read BLOG_POSTS from src/data.ts dynamically if possible
-  const dataPath = path.resolve(process.cwd(), "src/data.ts");
-  if (fs.existsSync(dataPath)) {
-    const dataContent = fs.readFileSync(dataPath, "utf-8");
-    // Extract titles and slugs using regex to avoid ts-node import issues in vanilla node
-    const postMatches = dataContent.matchAll(/id:\s*['"]([^'"]+)['"],\s*title:\s*['"]([^'"]+)['"],\s*excerpt:\s*['"]([^'"]+)['"],\s*slug:\s*['"]([^'"]+)['"]/g);
-    for (const match of postMatches) {
-      BLOG_POSTS.push({
-        id: match[1],
-        title: match[2],
-        description: match[3],
-        slug: match[4]
-      });
-    }
-  }
-} catch (e) {
-  console.warn("Could not parse static blog posts for SEO:", e);
-}
+import { BLOG_ARTICLES } from "./src/landing/data/blogData";
+
+const BLOG_POSTS = BLOG_ARTICLES.map(post => ({
+  id: post.id,
+  title: post.title,
+  description: post.description,
+  slug: post.slug
+}));
 
 function injectSEO(html: string, seo: { title: string; description: string; url: string; image: string; schemaJson?: string }) {
   let modified = html;
